@@ -1,0 +1,236 @@
+import { Court, Booking, DayOfWeek, TimePriceRange } from './types';
+
+const daysOfWeek: DayOfWeek[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+export const createDefaultPricingForDay = (day: DayOfWeek): TimePriceRange[] => {
+  if (day === 'Wed') {
+    return [
+      { id: `${day}-1`, start: '06:00 AM', end: '09:00 AM', rate: 300 },
+      { id: `${day}-2`, start: '09:00 AM', end: '05:00 PM', rate: 350 },
+      { id: `${day}-3`, start: '05:00 PM', end: '10:00 PM', rate: 400 },
+    ];
+  }
+  return [
+    { id: `${day}-1`, start: '06:00 AM', end: '12:00 PM', rate: 350 },
+    { id: `${day}-2`, start: '12:00 PM', end: '05:00 PM', rate: 350 },
+    { id: `${day}-3`, start: '05:00 PM', end: '10:00 PM', rate: 400 },
+  ];
+};
+
+export const defaultCourts: Court[] = [
+  {
+    id: 1,
+    name: 'Court 1',
+    surfaceType: 'indoor',
+    opensAt: '06:00',
+    closesAt: '22:00',
+    defaultPrice: 350,
+    status: 'active',
+    pricing: daysOfWeek.reduce((acc, day) => {
+      acc[day] = createDefaultPricingForDay(day);
+      return acc;
+    }, {} as Record<DayOfWeek, TimePriceRange[]>),
+  },
+  {
+    id: 2,
+    name: 'Court 2',
+    surfaceType: 'indoor',
+    opensAt: '06:00',
+    closesAt: '22:00',
+    defaultPrice: 350,
+    status: 'active',
+    pricing: daysOfWeek.reduce((acc, day) => {
+      acc[day] = [
+        { id: `${day}-1`, start: '06:00 AM', end: '01:00 PM', rate: 350 },
+        { id: `${day}-2`, start: '01:00 PM', end: '10:00 PM', rate: 350 },
+      ];
+      return acc;
+    }, {} as Record<DayOfWeek, TimePriceRange[]>),
+  },
+  {
+    id: 3,
+    name: 'Court 3',
+    surfaceType: 'outdoor',
+    opensAt: '08:00',
+    closesAt: '18:00',
+    defaultPrice: 250,
+    status: 'maintenance',
+    pricing: daysOfWeek.reduce((acc, day) => {
+      acc[day] = [
+        { id: `${day}-1`, start: '08:00 AM', end: '06:00 PM', rate: 250 },
+      ];
+      return acc;
+    }, {} as Record<DayOfWeek, TimePriceRange[]>),
+  },
+];
+
+export const defaultBookings: Booking[] = [
+  {
+    id: 1,
+    bookingId: 'BK-1001',
+    date: 'Oct 24, 2023',
+    time: '08:00 AM',
+    courtId: 1,
+    courtName: 'Court 1',
+    customerName: 'Rafael N.',
+    phone: '0917 123 4567',
+    status: 'paid',
+    amount: 2400,
+  },
+  {
+    id: 2,
+    bookingId: 'BK-1002',
+    date: 'Oct 24, 2023',
+    time: '10:00 AM',
+    courtId: 2,
+    courtName: 'West Court',
+    customerName: 'Maria S.',
+    phone: '0918 234 5678',
+    status: 'pending',
+    amount: 1800,
+  },
+  {
+    id: 3,
+    bookingId: 'BK-1003',
+    date: 'Oct 24, 2023',
+    time: '02:00 PM',
+    courtId: 3,
+    courtName: 'East Court',
+    customerName: 'Carlos A.',
+    phone: '0919 345 6789',
+    status: 'confirmed',
+    amount: 1500,
+  },
+  {
+    id: 4,
+    bookingId: 'BK-1004',
+    date: 'Oct 25, 2023',
+    time: '09:00 AM',
+    courtId: 1,
+    courtName: 'Indoor Studio',
+    customerName: 'Novak J.',
+    phone: '0920 456 7890',
+    status: 'cancelled',
+    amount: 3000,
+  },
+  {
+    id: 5,
+    bookingId: 'BK-1005',
+    date: 'Oct 23, 2023',
+    time: '04:00 PM',
+    courtId: 1,
+    courtName: 'Court 1',
+    customerName: 'Iga S.',
+    phone: '0921 567 8901',
+    status: 'completed',
+    amount: 2400,
+  },
+  {
+    id: 6,
+    bookingId: 'BK-1006',
+    date: 'Oct 25, 2023',
+    time: '11:00 AM',
+    courtId: 2,
+    courtName: 'West Court',
+    customerName: 'Coco G.',
+    phone: '0922 678 9012',
+    status: 'paid',
+    amount: 1800,
+  },
+  {
+    id: 7,
+    bookingId: 'BK-1007',
+    date: 'Oct 26, 2023',
+    time: '07:00 AM',
+    courtId: 1,
+    courtName: 'Court 1',
+    customerName: 'Roger F.',
+    phone: '0923 789 0123',
+    status: 'pending',
+    amount: 2400,
+  },
+  {
+    id: 8,
+    bookingId: 'BK-1008',
+    date: 'Oct 26, 2023',
+    time: '01:00 PM',
+    courtId: 3,
+    courtName: 'East Court',
+    customerName: 'Serena W.',
+    phone: '0924 890 1234',
+    status: 'paid',
+    amount: 1500,
+  },
+  {
+    id: 9,
+    bookingId: 'BK-1009',
+    date: 'Oct 22, 2023',
+    time: '03:00 PM',
+    courtId: 2,
+    courtName: 'West Court',
+    customerName: 'Ben S.',
+    phone: '0925 901 2345',
+    status: 'completed',
+    amount: 1800,
+  },
+  {
+    id: 10,
+    bookingId: 'BK-1010',
+    date: 'Oct 27, 2023',
+    time: '05:00 PM',
+    courtId: 1,
+    courtName: 'Court 1',
+    customerName: 'Andy M.',
+    phone: '0926 012 3456',
+    status: 'paid',
+    amount: 2400,
+  },
+  {
+    id: 11,
+    bookingId: 'BK-1011',
+    date: 'Oct 28, 2023',
+    time: '08:00 AM',
+    courtId: 1,
+    courtName: 'Court 1',
+    customerName: 'Santi Gomez',
+    phone: '0927 111 2222',
+    status: 'paid',
+    amount: 1200,
+  },
+  {
+    id: 12,
+    bookingId: 'BK-1012',
+    date: 'Oct 28, 2023',
+    time: '09:30 AM',
+    courtId: 3,
+    courtName: 'Court 3',
+    customerName: 'Marcus Tan',
+    phone: '0928 222 3333',
+    status: 'confirmed',
+    amount: 1000,
+  },
+  {
+    id: 13,
+    bookingId: 'BK-1013',
+    date: 'Oct 28, 2023',
+    time: '11:00 AM',
+    courtId: 2,
+    courtName: 'Court 2',
+    customerName: 'Elena Rodriguez',
+    phone: '0929 333 4444',
+    status: 'paid',
+    amount: 1200,
+  },
+  {
+    id: 14,
+    bookingId: 'BK-1014',
+    date: 'Oct 28, 2023',
+    time: '01:00 PM',
+    courtId: 1,
+    courtName: 'Court 1',
+    customerName: 'Vince Dizon',
+    phone: '0930 444 5555',
+    status: 'pending',
+    amount: 1200,
+  },
+];

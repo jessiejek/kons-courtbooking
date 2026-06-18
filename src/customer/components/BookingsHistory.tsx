@@ -1,0 +1,262 @@
+import React, { useState } from 'react';
+import { Calendar, ClipboardList, PlusCircle, Search, ChevronRight, Bell, Tag } from 'lucide-react';
+import { Booking, Court } from '../types';
+import { COURTS } from '../data';
+
+interface BookingsHistoryProps {
+  onNavigate: (screen: 'landing' | 'booking' | 'checkout' | 'confirmed' | 'bookings-list' | 'booking-detail') => void;
+  bookings: Booking[];
+  onViewDetail: (id: string) => void;
+  onOpenLogin: () => void;
+  role: 'user' | 'admin' | null;
+  onLogout: () => void;
+}
+
+export default function BookingsHistory({
+  onNavigate,
+  bookings,
+  onViewDetail,
+  onOpenLogin,
+  role,
+  onLogout,
+}: BookingsHistoryProps) {
+  const [activeFilterTab, setActiveFilterTab] = useState<'Upcoming' | 'Past' | 'All'>('All');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Get matching court image thumbnail helper
+  const getCourtImage = (courtId: string) => {
+    const found = COURTS.find(c => c.id === courtId);
+    return found ? found.image : 'https://images.unsplash.com/photo-1599586120429-48281b6f0ebb';
+  };
+
+  const getReadableSelectedDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const getFormattedTimeLabel = (t: string) => {
+    const [h, m] = t.split(':');
+    const hourVal = parseInt(h);
+    const suffix = hourVal >= 12 ? 'PM' : 'AM';
+    const displayH = hourVal % 12 === 0 ? 12 : hourVal % 12;
+    return `${displayH}:${m} ${suffix}`;
+  };
+
+  // Filter & Search Logic
+  const filteredBookings = bookings.filter((booking) => {
+    // 1. Tab Status Filter
+    if (activeFilterTab === 'Upcoming' && booking.status !== 'Upcoming') return false;
+    if (activeFilterTab === 'Past' && booking.status !== 'Past') return false;
+
+    // 2. Search Query matches Court name or ID
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      const matchName = booking.courtName.toLowerCase().includes(query);
+      const matchId = booking.id.toLowerCase().includes(query);
+      return matchName || matchId;
+    }
+
+    return true;
+  });
+
+  const handleOpenDetails = (id: string) => {
+    onViewDetail(id);
+  };
+
+  return (
+    <div className="bg-slate-50 min-h-screen font-sans flex flex-col">
+      {/* Header Bar */}
+      <header className="bg-slate-900 text-white py-4 px-6 border-b border-slate-800 sticky top-0 z-40 flex items-center justify-between">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate('landing')}>
+          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+            <span className="font-mono text-white font-extrabold text-[15px]">S</span>
+          </div>
+          <div>
+            <span className="font-sans font-black uppercase text-sm tracking-tight block">Sunshine pickleball</span>
+            <span className="font-mono text-[8px] uppercase tracking-widest text-blue-400 -mt-1 block font-semibold">User Dashboard</span>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          {role ? (
+            <button onClick={onLogout} className="text-slate-300 hover:text-white font-mono text-xs uppercase tracking-wider py-1 px-3 bg-zinc-800/80 rounded transition-colors">
+              Log out
+            </button>
+          ) : (
+            <button onClick={onOpenLogin} className="text-slate-300 hover:text-white font-mono text-xs uppercase tracking-wider py-1 px-3 border border-slate-600 hover:border-slate-400 rounded transition-colors">
+              Log in
+            </button>
+          )}
+          <button
+            onClick={() => onNavigate('booking')}
+            className="bg-blue-600 text-white font-mono font-bold text-xs uppercase px-4 py-2 rounded-lg hover:bg-blue-700 transition-all cursor-pointer"
+          >
+            + Book a court
+          </button>
+        </div>
+      </header>
+
+      {/* Hero Welcome Banner */}
+      <section className="bg-slate-900 text-white py-8 px-6 border-b border-white/5">
+        <div className="max-w-7xl w-full mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <span className="text-[10px] bg-blue-500/10 text-blue-300 border border-blue-500/20 font-mono font-bold px-2.5 py-1 rounded-full uppercase">
+              Authenticated Profile
+            </span>
+            <h2 className="text-3xl font-sans font-black tracking-tight text-white mt-2 leading-tight">
+              My reservations
+            </h2>
+            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+              Welcome back, Juan Dela Cruz. Easily track schedules, cancel bookings, or download transaction receipts.
+            </p>
+          </div>
+
+          <div className="flex gap-3 bg-slate-800/60 p-4 rounded-xl border border-slate-700/50 w-full md:w-auto text-xs">
+            <div>
+              <span className="block text-[9px] font-mono uppercase text-slate-400">Upcoming Plays</span>
+              <span className="block text-2xl font-black text-blue-400 mt-1">
+                {bookings.filter(b => b.status === 'Upcoming').length} slots
+              </span>
+            </div>
+            <div className="border-l border-zinc-700 pl-4">
+              <span className="block text-[9px] font-mono uppercase text-slate-400">Total Playtime</span>
+              <span className="block text-2xl font-black text-white mt-1">
+                {bookings.filter(b => b.status === 'Past').length * 2 + bookings.filter(b => b.status === 'Upcoming').length * 2} hrs
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Main interactive dashboard */}
+      <div className="max-w-7xl w-full mx-auto p-4 md:p-6 lg:p-8 space-y-6 flex-1">
+        
+        {/* Filter Controls Row */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
+          {/* Status Tabs */}
+          <div className="flex gap-1.5 border-r border-slate-100 pr-4">
+            {(['All', 'Upcoming', 'Past'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveFilterTab(tab)}
+                className={`px-4 py-2 rounded-lg text-xs font-mono font-bold uppercase transition-all cursor-pointer ${
+                  activeFilterTab === tab
+                    ? 'bg-slate-900 text-white hover:bg-slate-850 shadow-sm'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-600'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
+          {/* Search Box */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by Court Name or Reservation ID..."
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 text-xs focus:bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all"
+            />
+          </div>
+        </div>
+
+        {/* List of Court Reservation Cards */}
+        {filteredBookings.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredBookings.map((booking) => (
+              <div
+                key={booking.id}
+                className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between hover:shadow-md hover:border-slate-300 transition-all cursor-pointer"
+                onClick={() => handleOpenDetails(booking.id)}
+              >
+                {/* Upper part */}
+                <div>
+                  <div className="relative h-44 w-full bg-slate-100 overflow-hidden">
+                    <img
+                      src={getCourtImage(booking.courtId)}
+                      alt={booking.courtName}
+                      className="w-full h-full object-cover object-center scale-102 hover:scale-105 transition-transform duration-500"
+                      referrerPolicy="no-referrer"
+                    />
+                    
+                    {/* Status Absolute overlay Tag */}
+                    <div className="absolute top-3 right-3">
+                      {booking.status === 'Upcoming' && (
+                        <span className="text-[10px] bg-blue-50 text-blue-800 font-mono font-black uppercase px-2.5 py-1 rounded-full border border-blue-200 shadow-sm">
+                          ● Upcoming
+                        </span>
+                      )}
+                      {booking.status === 'Past' && (
+                        <span className="text-[10px] bg-zinc-800/90 text-[#F1F5F9] font-mono font-bold uppercase px-2.5 py-1 rounded-full shadow-sm">
+                          Past Play
+                        </span>
+                      )}
+                      {booking.status === 'Cancelled' && (
+                        <span className="text-[10px] bg-[#BA1A1A] text-white font-mono font-bold uppercase px-2.5 py-1 rounded-full shadow-sm">
+                          Cancelled
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-xs text-white px-2.5 py-1 rounded text-[10px] font-mono font-bold uppercase">
+                      ID: #{booking.id}
+                    </div>
+                  </div>
+
+                  <div className="p-5 space-y-3">
+                    <h3 className="font-sans font-extrabold text-slate-900 text-base leading-tight">
+                      {booking.courtName}
+                    </h3>
+                    
+                    <div className="space-y-1.5 text-xs text-slate-600">
+                      <p className="flex justify-between">
+                        <span className="font-mono text-slate-400 text-[10px] uppercase">Schedule Date</span>
+                        <span className="font-semibold text-slate-800">{getReadableSelectedDate(booking.date)}</span>
+                      </p>
+                      <p className="flex justify-between">
+                        <span className="font-mono text-slate-400 text-[10px] uppercase">Block Time</span>
+                        <span className="font-semibold text-slate-900 font-mono">
+                          {getFormattedTimeLabel(booking.startTime)} - {getFormattedTimeLabel(booking.endTime)}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer block */}
+                <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                  <div>
+                    <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest block">TOTAL COST</span>
+                    <span className="text-sm font-mono font-bold text-slate-900 leading-none">₱{booking.price}.00</span>
+                  </div>
+
+                  <button className="flex items-center gap-1 font-mono text-xs font-bold uppercase text-blue-600 hover:text-blue-700 hover:underline cursor-pointer">
+                    View Receipt <ChevronRight className="w-4.5 h-4.5 text-blue-600" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center max-w-md mx-auto space-y-4">
+            <ClipboardList className="w-12 h-12 text-slate-300 mx-auto" />
+            <h3 className="font-sans font-bold text-slate-900">No Reservations Found</h3>
+            <p className="text-xs text-slate-500 leading-normal">
+              No matching booking details were recorded under these query parameters. Book a new court to get playing right away!
+            </p>
+            <button
+              onClick={() => onNavigate('booking')}
+              className="px-5 py-2.5 bg-blue-600 text-white font-mono text-xs font-bold uppercase rounded-lg hover:bg-slate-900 hover:text-white transition-all cursor-pointer"
+            >
+              Start New Booking
+            </button>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
