@@ -4,6 +4,7 @@
 React 19 + Vite 6 + Tailwind CSS v4 + Supabase + react-router-dom v6.
 Dev server runs on **port 3000** (user runs it in VS Code — never start it here).
 Brand color: `#00694c` green. Font: Hanken Grotesk.
+Deployed at: https://courtbooking-sooty.vercel.app
 
 ## Supabase
 - URL: `https://hwwwhdtqdzlizhfqcdow.supabase.co`
@@ -14,19 +15,31 @@ Brand color: `#00694c` green. Font: Hanken Grotesk.
 
 ## Auth
 - `App.tsx` owns all auth state: `role`, `currentUser`, `authReady`
-- `getSession()` on mount + `onAuthStateChange` subscription restores OAuth sessions
+- `getSession()` on mount + `onAuthStateChange` restores OAuth sessions
 - `CurrentUser` interface: `{ name: string; email: string; avatar?: string; }`
-- Google OAuth: client ID `506648259313-am3a02es4c4gtasugfej0datp04jvapd.apps.googleusercontent.com`
-- Redirect URI: `https://hwwwhdtqdzlizhfqcdow.supabase.co/auth/v1/callback` → back to `http://localhost:3000`
+- Admin users are auto-redirected to `/admin` via `AppRoutes` in `App.tsx`
+- Role comes from `user_metadata.role` in Supabase auth — set via:
+  ```sql
+  update auth.users set raw_user_meta_data = raw_user_meta_data || '{"role": "admin"}' where email = '...';
+  ```
+- Google OAuth client ID: `506648259313-am3a02es4c4gtasugfej0datp04jvapd.apps.googleusercontent.com`
+- Redirect URI: `https://hwwwhdtqdzlizhfqcdow.supabase.co/auth/v1/callback`
+
+## No localStorage
+**Zero localStorage in the app.** Everything reads/writes Supabase only.
+- Bookings — Supabase
+- Courts — Supabase (`courts` table)
+- Customer booking history — filtered by `customer_email`
+- BookingDetailPage — fetches its own booking by `booking_ref` from Supabase
 
 ## Key Files
 | File | What it does |
 |---|---|
-| `src/App.tsx` | Root: auth state, BrowserRouter, role routing |
+| `src/App.tsx` | Root — auth state, `AppRoutes` (admin redirect), BrowserRouter |
 | `src/LoginModal.tsx` | Google OAuth + email/password + demo role cards |
 | `src/lib/supabase.ts` | Shared Supabase client |
-| `src/customer/CustomerApp.tsx` | Customer routes + booking state machine |
-| `src/admin/AdminApp.tsx` | Admin routes + booking CRUD + Realtime feed |
+| `src/customer/CustomerApp.tsx` | Customer routes, no local bookings state |
+| `src/admin/AdminApp.tsx` | Admin routes, loads courts+bookings from Supabase |
 | `src/admin/components/Sidebar.tsx` | Admin nav + currentUser avatar/name + Sign out |
 | `src/hooks/useRealtimeSlots.ts` | Live slot availability for BookingSelector |
 | `src/hooks/useRealtimeBookings.ts` | Live booking updates (admin=all, customer=mine) |
@@ -41,25 +54,34 @@ Brand color: `#00694c` green. Font: Hanken Grotesk.
 
 ## Roles
 - `null` = guest (customer pages only)
-- `user` = logged-in player (customer + My Bookings)
-- `admin` = full access (customer + all `/admin/*`)
+- `user` = logged-in player (customer + My Bookings, filtered by email)
+- `admin` = auto-redirected to `/admin`, full access
 
 ## Supabase Tables
 `profiles` · `locations` · `courts` · `court_pricing` · `bookings` · `booking_slots` · `announcements`
-- `bookings.court_id` and `booking_slots.court_id` are **nullable** (customer app sends null)
-- `bookings.booking_ref` format: `SPC-xxxxx`
+- `bookings.court_id` and `booking_slots.court_id` are **nullable**
+- `bookings.booking_ref` format: `SPC-xxxxx` (customer) / `BK-xxxx` (admin manual)
+- `bookings.customer_email` used for per-user filtering in BookingsHistory
 
-## Known Gaps (pick up here next session)
-- [ ] `BookingsHistory` fetches all bookings — needs `user_id` filter for per-user isolation
-- [ ] `court_id` always null from customer — needs slug→id lookup or DB trigger
-- [ ] Admin revenue chart uses localStorage data, not Supabase
-- [ ] Facebook OAuth not set up in FB Developer Console yet
+## Courts seed data (run if courts table is empty)
+```sql
+insert into public.courts (slug, name, surface_type, default_price, status) values
+  ('court-1', 'Court 1 (Premium Indoor)', 'indoor', 300, 'active'),
+  ('court-2', 'Court 2 (Standard Indoor)', 'indoor', 250, 'active'),
+  ('court-3', 'Court 3 (Outdoor)', 'outdoor', 200, 'active'),
+  ('court-4', 'Court 4 (Outdoor)', 'outdoor', 200, 'active')
+on conflict (slug) do nothing;
+```
+
+## Known Gaps
+- [ ] Court pricing editor (`handleUpdateCourtPricing`) saves to React state only — not wired to `court_pricing` table yet
+- [ ] Facebook OAuth not set up in FB Developer Console
 - [ ] `src/LoginPage.tsx` is a dead unused file
 
 ## TypeScript Note
 `src/lib/supabase.ts` has a pre-existing `ImportMeta.env` TS error from Vite config — not a real error, ignore it.
 
 ## Conventions
-- All nav bars show avatar+name pill when logged in (not plain "Log out")
-- `isSupabaseEnabled` gates all DB calls — localStorage fallback when false
-- Demo mode: role cards in LoginModal bypass real auth
+- All nav bars show avatar+name pill when logged in
+- CheckoutPage auto-fills name+email from `currentUser` on mount
+- Admin "New Booking" form uses `type="date"` and `type="time"` inputs

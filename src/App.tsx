@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import CustomerApp from './customer/CustomerApp';
 import AdminApp from './admin/AdminApp';
 import { supabase, isSupabaseEnabled } from './lib/supabase';
@@ -8,6 +8,33 @@ export interface CurrentUser {
   name: string;
   email: string;
   avatar?: string;
+}
+
+interface RoutesProps {
+  role: 'user' | 'admin' | null;
+  onLogin: (role: 'user' | 'admin') => void;
+  onLogout: () => void;
+  currentUser: CurrentUser | null;
+}
+
+function AppRoutes({ role, onLogin, onLogout, currentUser }: RoutesProps) {
+  const { pathname } = useLocation();
+
+  // Auto-redirect admin users to /admin when they land on customer pages
+  if (role === 'admin' && !pathname.startsWith('/admin')) {
+    return <Navigate to="/admin" replace />;
+  }
+
+  return (
+    <Routes>
+      <Route path="/admin/*" element={
+        <AdminApp role={role} onLogin={onLogin} onLogout={onLogout} currentUser={currentUser} />
+      } />
+      <Route path="*" element={
+        <CustomerApp role={role} onLogin={onLogin} onLogout={onLogout} currentUser={currentUser} />
+      } />
+    </Routes>
+  );
 }
 
 export default function App() {
@@ -56,14 +83,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/admin/*" element={
-          <AdminApp role={role} onLogin={setRole} onLogout={handleLogout} currentUser={currentUser} />
-        } />
-        <Route path="*" element={
-          <CustomerApp role={role} onLogin={setRole} onLogout={handleLogout} currentUser={currentUser} />
-        } />
-      </Routes>
+      <AppRoutes role={role} onLogin={setRole} onLogout={handleLogout} currentUser={currentUser} />
     </BrowserRouter>
   );
 }

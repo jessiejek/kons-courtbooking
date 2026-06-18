@@ -61,20 +61,29 @@ export default function CheckoutPage({
     }
   }, [selectedSlots, onNavigate]);
 
-  const handleSocialLogin = (platform: 'Google' | 'Facebook') => {
-    setFullName('Juan Dela Cruz');
-    setPhoneNumber('+63 912 345 6789');
-    setEmail('juan.delacruz@gmail.com');
+  // Pre-fill guest details from logged-in user
+  useEffect(() => {
+    if (currentUser) {
+      setFullName(currentUser.name);
+      setEmail(currentUser.email);
+      setIsSocialLoggedIn(true);
+    }
+  }, [currentUser]);
+
+  const handleSocialLogin = (_platform: 'Google' | 'Facebook') => {
+    setFullName(currentUser?.name ?? 'Juan Dela Cruz');
+    setEmail(currentUser?.email ?? 'juan.delacruz@gmail.com');
+    setPhoneNumber('');
     setIsSocialLoggedIn(true);
   };
 
   const handleDemoFill = () => {
-    setFullName('Juan Dela Cruz');
+    setFullName(currentUser?.name ?? 'Juan Dela Cruz');
     setPhoneNumber('+63 912 345 6789');
-    setEmail('juan.delacruz@gmail.com');
+    setEmail(currentUser?.email ?? 'juan.delacruz@gmail.com');
     setIsSocialLoggedIn(true);
     setPaymentMethod('Card');
-    setCardName('JUAN DELA CRUZ');
+    setCardName((currentUser?.name ?? 'Juan Dela Cruz').toUpperCase());
     setCardNumber('4242 4242 4242 4242');
     setCardExpiry('12/28');
     setCardCVV('123');

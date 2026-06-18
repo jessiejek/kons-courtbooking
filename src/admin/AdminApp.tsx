@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Routes, Route, Navigate, useParams } from 're
 import { Calendar, User, Phone, X, Sparkles } from 'lucide-react';
 import LoginModal from '../LoginModal';
 import { Court, Booking, DayOfWeek, TimePriceRange, BookingStatus } from './types';
-import { defaultCourts, defaultBookings } from './data';
+import { defaultCourts } from './data';
 import { useRealtimeBookings } from '../hooks/useRealtimeBookings';
 import { supabase, isSupabaseEnabled } from '../lib/supabase';
 import Sidebar from './components/Sidebar';
@@ -12,9 +12,6 @@ import DashboardView from './components/DashboardView';
 import BookingsView from './components/BookingsView';
 import CourtsPricingView from './components/CourtsPricingView';
 import AddEditCourtView from './components/AddEditCourtView';
-
-const STORAGE_KEY_COURTS = 'court_and_co_courts_v1';
-const STORAGE_KEY_BOOKINGS = 'court_and_co_bookings_v1';
 
 interface Props {
   role: 'user' | 'admin' | null;
@@ -75,6 +72,19 @@ function LocationsView() {
   );
 }
 
+const mapRow = (row: any): Booking => ({
+  id: row.id,
+  bookingId: row.booking_ref,
+  date: row.booking_date,
+  time: row.start_time?.slice(0, 5) ?? '',
+  courtId: row.court_id ?? 1,
+  courtName: row.court_name ?? '',
+  customerName: row.customer_name ?? '',
+  phone: row.customer_phone ?? '',
+  status: row.booking_status,
+  amount: Number(row.total_amount ?? 0),
+});
+
 export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -82,96 +92,138 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
   const [searchText, setSearchText] = useState('');
   const [courts, setCourts] = useState<Court[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [isNewBookingOpen, setIsNewBookingOpen] = useState(false);
   const [nbCustomer, setNbCustomer] = useState('');
   const [nbPhone, setNbPhone] = useState('');
-  const [nbDate, setNbDate] = useState('Oct 28, 2023');
-  const [nbTime, setNbTime] = useState('09:00 AM');
+  const [nbDate, setNbDate] = useState('');
+  const [nbTime, setNbTime] = useState('09:00');
   const [nbCourtId, setNbCourtId] = useState<number>(1);
   const [nbStatus, setNbStatus] = useState<BookingStatus>('pending');
   const [nbAmount, setNbAmount] = useState(1200);
 
   useEffect(() => {
-    const savedCourts = localStorage.getItem(STORAGE_KEY_COURTS);
-    const savedBookings = localStorage.getItem(STORAGE_KEY_BOOKINGS);
-    setCourts(savedCourts ? JSON.parse(savedCourts) : defaultCourts);
-    if (!savedCourts) localStorage.setItem(STORAGE_KEY_COURTS, JSON.stringify(defaultCourts));
-    setBookings(savedBookings ? JSON.parse(savedBookings) : defaultBookings);
-    if (!savedBookings) localStorage.setItem(STORAGE_KEY_BOOKINGS, JSON.stringify(defaultBookings));
+    loadCourts();
+    loadBookings();
   }, []);
 
-  const saveCourtsState = (updated: Court[]) => {
-    setCourts(updated);
-    localStorage.setItem(STORAGE_KEY_COURTS, JSON.stringify(updated));
+  const loadCourts = async () => {
+    if (!isSupabaseEnabled || !supabase) { setCourts(defaultCourts); return; }
+    const { data, error } = await supabase
+      .from('courts')
+      .select('*')
+      .order('id', { ascending: true });
+    if (error || !data || data.length === 0) { setCourts(defaultCourts); return; }
+    setCourts(data.map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      surfaceType: row.surface_type ?? 'indoor',
+      opensAt: '06:00',
+      closesAt: '22:00',
+      defaultPrice: Number(row.default_price ?? 300),
+      status: row.status ?? 'active',
+      pricing: {},
+    })));
   };
 
-  const saveBookingsState = (updated: Booking[]) => {
-    setBookings(updated);
-    localStorage.setItem(STORAGE_KEY_BOOKINGS, JSON.stringify(updated));
+  const loadBookings = async () => {
+    if (!isSupabaseEnabled || !supabase) return;
+    setLoadingBookings(true);
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .order('created_at', { ascending: false });
+    setLoadingBookings(false);
+    if (error) { console.error('[Supabase] load bookings error:', error); return; }
+    setBookings((data ?? []).map(mapRow));
   };
 
-  const handleSaveCourt = (court: Court) => {
+  const handleSaveCourt = async (court: Court) => {
+    const row = {
+      name: court.name,
+      surface_type: court.surfaceType,
+      default_price: court.defaultPrice,
+      status: court.status,
+    };
+    if (!isSupabaseEnabled || !supabase) { setCourts(prev => prev.some(c => c.id === court.id) ? prev.map(c => c.id === court.id ? court : c) : [...prev, court]); return; }
     const exists = courts.some(c => c.id === court.id);
-    saveCourtsState(exists ? courts.map(c => c.id === court.id ? court : c) : [...courts, court]);
+    if (exists) {
+      await supabase.from('courts').update(row).eq('id', court.id);
+    } else {
+      await supabase.from('courts').insert(row);
+    }
+    await loadCourts();
   };
 
-  const handleDeleteCourt = (courtId: number) => {
-    saveCourtsState(courts.filter(c => c.id !== courtId));
+  const handleDeleteCourt = async (courtId: number) => {
+    if (!isSupabaseEnabled || !supabase) { setCourts(prev => prev.filter(c => c.id !== courtId)); return; }
+    await supabase.from('courts').update({ status: 'inactive' }).eq('id', courtId);
+    await loadCourts();
   };
 
   const handleUpdateCourtPricing = (courtId: number, day: DayOfWeek, ranges: TimePriceRange[]) => {
-    saveCourtsState(courts.map(c =>
+    setCourts(prev => prev.map(c =>
       c.id === courtId ? { ...c, pricing: { ...c.pricing, [day]: ranges } } : c
     ));
   };
 
-  const handleCreateBookingSubmit = (e: FormEvent) => {
+  const handleCreateBookingSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!nbCustomer.trim() || !nbPhone.trim()) { alert('Please fill out all fields.'); return; }
+    if (!isSupabaseEnabled || !supabase) { alert('Supabase not connected.'); return; }
+
     const selectedCourt = courts.find(c => c.id === Number(nbCourtId)) || courts[0];
-    const newBooking: Booking = {
-      id: Date.now(),
-      bookingId: `BK-${Math.floor(1000 + Math.random() * 9000)}`,
-      date: nbDate,
-      time: nbTime,
-      courtId: selectedCourt?.id || 1,
-      courtName: selectedCourt?.name || 'Center Court',
-      customerName: nbCustomer,
-      phone: nbPhone,
-      status: nbStatus,
-      amount: Number(nbAmount),
-    };
-    saveBookingsState([newBooking, ...bookings]);
-    setNbCustomer(''); setNbPhone(''); setNbAmount(1200); setIsNewBookingOpen(false);
-    alert(`Successfully booked ${selectedCourt?.name} for ${nbCustomer}!`);
+    const bookingRef = `BK-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const { error } = await supabase.from('bookings').insert({
+      booking_ref: bookingRef,
+      booking_date: nbDate,
+      start_time: nbTime,
+      end_time: nbTime,
+      court_id: selectedCourt?.id ?? null,
+      court_name: selectedCourt?.name ?? 'Center Court',
+      customer_name: nbCustomer,
+      customer_phone: nbPhone,
+      booking_status: nbStatus,
+      payment_method: 'cash',
+      payment_status: nbStatus === 'paid' ? 'paid' : 'pending',
+      total_amount: Number(nbAmount),
+    });
+
+    if (error) {
+      console.error('[Supabase] admin booking insert error:', error);
+      alert('Failed to save booking. Please try again.');
+      return;
+    }
+
+    setNbCustomer(''); setNbPhone(''); setNbDate(''); setNbAmount(1200); setIsNewBookingOpen(false);
+    await loadBookings();
+    alert(`Booking created for ${nbCustomer}!`);
   };
 
   const activeDetailBooking = bookings.find(b => b.bookingId === selectedBookingId);
 
   const handleUpdateBookingStatus = async (bookingId: string, nextStatus: BookingStatus) => {
-    saveBookingsState(bookings.map(b => b.bookingId === bookingId ? { ...b, status: nextStatus } : b));
-
-    if (isSupabaseEnabled && supabase) {
-      await supabase
-        .from('bookings')
-        .update({ booking_status: nextStatus })
-        .eq('booking_ref', bookingId);
-    }
+    if (!isSupabaseEnabled || !supabase) return;
+    const { error } = await supabase
+      .from('bookings')
+      .update({ booking_status: nextStatus })
+      .eq('booking_ref', bookingId);
+    if (error) { console.error('[Supabase] status update error:', error); return; }
+    setBookings(prev => prev.map(b => b.bookingId === bookingId ? { ...b, status: nextStatus } : b));
   };
 
   const handleDeleteBooking = async (bookingId: string) => {
-    if (confirm('Are you sure you want to permanently cancel and remove this booking from logs?')) {
-      saveBookingsState(bookings.filter(b => b.bookingId !== bookingId));
-      setSelectedBookingId(null);
-
-      if (isSupabaseEnabled && supabase) {
-        await supabase
-          .from('bookings')
-          .update({ booking_status: 'cancelled' })
-          .eq('booking_ref', bookingId);
-      }
-    }
+    if (!confirm('Cancel and remove this booking?')) return;
+    if (!isSupabaseEnabled || !supabase) return;
+    const { error } = await supabase
+      .from('bookings')
+      .update({ booking_status: 'cancelled' })
+      .eq('booking_ref', bookingId);
+    if (error) { console.error('[Supabase] cancel booking error:', error); return; }
+    setBookings(prev => prev.map(b => b.bookingId === bookingId ? { ...b, status: 'cancelled' } : b));
+    setSelectedBookingId(null);
   };
 
   // ── Realtime: new bookings arrive live ──────────────────
@@ -180,25 +232,12 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
   useRealtimeBookings({
     mode: 'all',
     onInsert: (row) => {
-      // Map Supabase row → local Booking shape and prepend
-      const incoming: Booking = {
-        id: row.id,
-        bookingId: row.booking_ref,
-        date: row.booking_date,
-        time: row.start_time?.slice(0, 5) ?? '',
-        courtId: row.court_id,
-        courtName: row.court_name,
-        customerName: row.customer_name,
-        phone: row.customer_phone,
-        status: row.booking_status,
-        amount: Number(row.total_amount),
-      };
-      saveBookingsState([incoming, ...bookings]);
+      setBookings(prev => [mapRow(row), ...prev]);
       setNewBookingCount((n) => n + 1);
     },
     onUpdate: (row) => {
-      saveBookingsState(
-        bookings.map((b) =>
+      setBookings(prev =>
+        prev.map((b) =>
           b.bookingId === row.booking_ref
             ? { ...b, status: row.booking_status as BookingStatus }
             : b
@@ -225,6 +264,11 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
         <Header searchText={searchText} onSearchChange={setSearchText} backAction={backAction} />
 
         <main className="p-10 max-w-7xl w-full mx-auto flex-1 pb-24">
+          {loadingBookings && (
+            <div className="text-center py-4 text-sm text-on-surface-variant font-medium animate-pulse">
+              Loading bookings from Supabase…
+            </div>
+          )}
           <Routes>
             <Route path="/" element={
               <DashboardView
@@ -241,6 +285,7 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
                 courts={courts}
                 onOpenBookingDetails={setSelectedBookingId}
                 onAddNewBooking={() => setIsNewBookingOpen(true)}
+                onRefresh={loadBookings}
               />
             } />
 
@@ -410,12 +455,12 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">Reserve Date</label>
-                    <input type="text" required value={nbDate} onChange={(e) => setNbDate(e.target.value)} placeholder="Oct 28, 2023"
+                    <input type="date" required value={nbDate} onChange={(e) => setNbDate(e.target.value)}
                       className="w-full bg-white border border-outline-variant rounded-lg p-2 text-sm focus:border-primary focus:ring-0 font-medium" />
                   </div>
                   <div className="space-y-1">
                     <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">Slot Hour</label>
-                    <input type="text" required value={nbTime} onChange={(e) => setNbTime(e.target.value)} placeholder="09:00 AM"
+                    <input type="time" required value={nbTime} onChange={(e) => setNbTime(e.target.value)}
                       className="w-full bg-white border border-outline-variant rounded-lg p-2 text-sm focus:border-primary focus:ring-0 font-medium" />
                   </div>
                 </div>

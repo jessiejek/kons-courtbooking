@@ -33,10 +33,17 @@ export default function BookingsHistory({
 
     const fetchBookings = async () => {
       setIsFetching(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from('bookings')
         .select('id, booking_ref, booking_date, start_time, end_time, court_name, customer_name, customer_phone, booking_status, payment_method, total_amount, created_at')
         .order('created_at', { ascending: false });
+
+      // Filter by logged-in user's email so each customer only sees their own bookings
+      if (currentUser?.email) {
+        query = query.eq('customer_email', currentUser.email);
+      }
+
+      const { data, error } = await query;
 
       if (!error && data) {
         const statusMap: Record<string, Booking['status']> = {
@@ -160,7 +167,7 @@ export default function BookingsHistory({
               {isFetching && <RefreshCw className="w-5 h-5 text-blue-400 animate-spin" />}
             </h2>
             <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-              Welcome back, Juan Dela Cruz. Easily track schedules, cancel bookings, or download transaction receipts.
+              Welcome back, {currentUser?.name ?? 'Player'}. Easily track schedules, cancel bookings, or download transaction receipts.
             </p>
           </div>
 

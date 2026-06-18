@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import { Screen, Booking, Court } from './types';
-import { COURTS, INITIAL_BOOKINGS } from './data';
+import { COURTS } from './data';
 import LandingPage from './components/LandingPage';
 import BookingSelector from './components/BookingSelector';
 import CheckoutPage from './components/CheckoutPage';
@@ -35,32 +35,14 @@ export default function CustomerApp({ role, onLogin, onLogout, currentUser }: Pr
   const [selectedCourtId, setSelectedCourtId] = useState('court-1');
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [cartTimeLeft, setCartTimeLeft] = useState<number>(600);
-  const [bookings, setBookings] = useState<Booking[]>(() => {
-    const saved = localStorage.getItem('sunshine_pick_bookings');
-    if (saved) {
-      try { return JSON.parse(saved); } catch { return INITIAL_BOOKINGS; }
-    }
-    return INITIAL_BOOKINGS;
-  });
   const [lastCommittedBooking, setLastCommittedBooking] = useState<Booking | null>(null);
   const [techModalOpen, setTechModalOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
 
-  useEffect(() => {
-    localStorage.setItem('sunshine_pick_bookings', JSON.stringify(bookings));
-  }, [bookings]);
-
   const handleCompleteBooking = (newBooking: Booking) => {
-    setBookings((prev) => [newBooking, ...prev]);
     setLastCommittedBooking(newBooking);
     setSelectedSlots([]);
     setCartTimeLeft(600);
-  };
-
-  const handleCancelBooking = (id: string) => {
-    setBookings((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, status: 'Cancelled' as const } : b))
-    );
   };
 
   const getActiveCourtDetails = (): Court =>
@@ -123,7 +105,7 @@ export default function CustomerApp({ role, onLogin, onLogout, currentUser }: Pr
         <Route path="/bookings" element={
           <BookingsHistory
             {...sharedNav}
-            bookings={bookings}
+            bookings={[]}
             onViewDetail={handleViewDetail}
           />
         } />
@@ -131,8 +113,7 @@ export default function CustomerApp({ role, onLogin, onLogout, currentUser }: Pr
         <Route path="/bookings/:id" element={
           <BookingDetailPage
             {...sharedNav}
-            bookings={bookings}
-            onCancelBooking={handleCancelBooking}
+            onCancelBooking={() => {}}
           />
         } />
 

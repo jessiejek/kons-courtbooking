@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { ChevronLeft, Trash2, Download, ShieldAlert, Phone, MapPin, Printer, ExternalLink, HelpCircle, X, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, Trash2, Download, ShieldAlert, Phone, MapPin, Printer, X, ShieldCheck } from 'lucide-react';
 import { Booking } from '../types';
 import { COURTS } from '../data';
 import { useRealtimeBookings } from '../../hooks/useRealtimeBookings';
+import { supabase, isSupabaseEnabled } from '../../lib/supabase';
 
 interface BookingDetailPageProps {
   onNavigate: (screen: 'landing' | 'booking' | 'checkout' | 'confirmed' | 'bookings-list' | 'booking-detail') => void;
-  bookings: Booking[];
   onCancelBooking: (id: string) => void;
   onOpenLogin: () => void;
   role: 'user' | 'admin' | null;
@@ -17,7 +17,6 @@ interface BookingDetailPageProps {
 
 export default function BookingDetailPage({
   onNavigate,
-  bookings,
   onCancelBooking,
   onOpenLogin,
   role,
@@ -25,13 +24,46 @@ export default function BookingDetailPage({
   onLogout,
 }: BookingDetailPageProps) {
   const { id } = useParams<{ id: string }>();
+  const [booking, setBooking] = useState<Booking | null>(null);
+  const [loadingBooking, setLoadingBooking] = useState(true);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [phoneDialed, setPhoneDialed] = useState(false);
   const [liveStatus, setLiveStatus] = useState<Booking['status'] | null>(null);
 
-  const booking = bookings.find((b) => b.id === id);
+  useEffect(() => {
+    if (!id || !isSupabaseEnabled || !supabase) { setLoadingBooking(false); return; }
+    supabase
+      .from('bookings')
+      .select('*')
+      .eq('booking_ref', id)
+      .single()
+      .then(({ data, error }) => {
+        if (!error && data) {
+          const statusMap: Record<string, Booking['status']> = {
+            confirmed: 'Upcoming', paid: 'Upcoming',
+            completed: 'Past', cancelled: 'Cancelled', pending: 'Upcoming',
+          };
+          setBooking({
+            id: data.booking_ref,
+            courtId: 'court-1',
+            courtName: data.court_name ?? '',
+            date: data.booking_date,
+            startTime: data.start_time?.slice(0, 5) ?? '09:00',
+            endTime: data.end_time?.slice(0, 5) ?? '11:00',
+            slots: [],
+            price: Number(data.total_amount ?? 0),
+            status: statusMap[data.booking_status] ?? 'Upcoming',
+            fullName: data.customer_name ?? '',
+            phoneNumber: data.customer_phone ?? '',
+            paymentMethod: (data.payment_method === 'card' ? 'Card' : data.payment_method === 'gcash' ? 'GCash' : 'Online Banking') as Booking['paymentMethod'],
+            createdAt: data.created_at,
+          });
+        }
+        setLoadingBooking(false);
+      });
+  }, [id]);
 
   // Subscribe to status changes for this specific booking
   useRealtimeBookings({
@@ -54,6 +86,21 @@ export default function BookingDetailPage({
   const effectiveBooking = booking && liveStatus
     ? { ...booking, status: liveStatus }
     : booking;
+
+  const handleConfirmCancel = async () => {
+    if (!booking || !isSupabaseEnabled || !supabase) return;
+    await supabase.from('bookings').update({ booking_status: 'cancelled' }).eq('booking_ref', booking.id);
+    setBooking(prev => prev ? { ...prev, status: 'Cancelled' } : prev);
+    setShowCancelModal(false);
+  };
+
+  if (loadingBooking) {
+    return (
+      <div className="bg-slate-50 min-h-screen flex items-center justify-center">
+        <p className="text-sm text-slate-400 font-mono animate-pulse">Loading booking…</p>
+      </div>
+    );
+  }
 
   if (!booking) {
     return (
@@ -92,10 +139,6 @@ export default function BookingDetailPage({
 
   const activeCourt = getCourtDetails();
 
-  const handleConfirmCancel = () => {
-    onCancelBooking(booking.id);
-    setShowCancelModal(false);
-  };
 
   return (
     <div className="bg-slate-50 min-h-screen font-sans flex flex-col">

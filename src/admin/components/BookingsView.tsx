@@ -17,14 +17,24 @@ interface BookingsViewProps {
   courts: Court[];
   onOpenBookingDetails: (bookingId: string) => void;
   onAddNewBooking: () => void;
+  onRefresh?: () => void;
 }
 
-export default function BookingsView({ 
-  bookings, 
-  courts, 
+export default function BookingsView({
+  bookings,
+  courts,
   onOpenBookingDetails,
-  onAddNewBooking
+  onAddNewBooking,
+  onRefresh,
 }: BookingsViewProps) {
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    if (!onRefresh) return;
+    setRefreshing(true);
+    await onRefresh();
+    setRefreshing(false);
+  };
   // Filters state
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCourt, setSelectedCourt] = useState('All courts');
@@ -92,13 +102,23 @@ export default function BookingsView({
             View and manage all reservations across your facilities.
           </p>
         </div>
-        <button
-          onClick={onAddNewBooking}
-          className="bg-primary text-on-primary font-semibold text-xs py-2.5 px-5 rounded-lg hover:bg-opacity-95 active:scale-[0.98] transition-all flex items-center gap-2 uppercase tracking-wider"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Reservation</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            title="Reload from Supabase"
+            className="border border-outline-variant bg-white text-on-surface-variant font-semibold text-xs py-2.5 px-3 rounded-lg hover:bg-surface-container-low active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={onAddNewBooking}
+            className="bg-primary text-on-primary font-semibold text-xs py-2.5 px-5 rounded-lg hover:bg-opacity-95 active:scale-[0.98] transition-all flex items-center gap-2 uppercase tracking-wider"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Reservation</span>
+          </button>
+        </div>
       </div>
 
       {/* Toolbar Filters Row */}
