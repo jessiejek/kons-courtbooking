@@ -55,8 +55,8 @@ export default function CheckoutPage({
   // Online Banking Inputs
   const [selectedBank, setSelectedBank] = useState('BDO');
 
-  // Processing state loader
   const [isProcessing, setIsProcessing] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
 
   // Redirect if no slots selected on mount
   useEffect(() => {
@@ -200,45 +200,51 @@ export default function CheckoutPage({
     };
 
     if (isSupabaseEnabled && supabase) {
-      try {
-        // Insert the booking row
-        const { data: bookingRow, error: bookingErr } = await supabase
-          .from('bookings')
-          .insert({
-            booking_ref: finalBookingId,
-            booking_date: selectedDate,
-            start_time: sorted[0],
-            end_time: endTime,
-            court_id: courtDbId ?? null,
-            court_name: selectedCourt.name,
-            customer_name: fullName,
-            customer_phone: phoneNumber,
-            customer_email: email || null,
-            booking_status: 'confirmed',
-            payment_method: paymentMethod.toLowerCase().replace(' ', '_'),
-            payment_status: 'paid',
-            total_amount: totalDue,
-          })
-          .select('id')
-          .single();
+      // Insert booking header
+      const { data: bookingRow, error: bookingErr } = await supabase
+        .from('bookings')
+        .insert({
+          booking_ref: finalBookingId,
+          booking_date: selectedDate,
+          start_time: sorted[0],
+          end_time: endTime,
+          court_id: courtDbId ?? null,
+          court_name: selectedCourt.name,
+          customer_name: fullName,
+          customer_phone: phoneNumber,
+          customer_email: email || null,
+          booking_status: 'confirmed',
+          payment_method: paymentMethod.toLowerCase().replace(' ', '_'),
+          payment_status: 'paid',
+          total_amount: totalDue,
+        })
+        .select('id')
+        .single();
 
-        if (bookingErr) console.error('[Supabase] bookings insert error:', bookingErr);
-        if (!bookingErr && bookingRow) {
-          // Insert one slot row per selected hour
-          const slotRows = selectedSlots.map((slotTime) => ({
-            booking_id: bookingRow.id,
-            court_id: courtDbId ?? null,
-            slot_date: selectedDate,
-            start_time: slotTime,
-            end_time: `${(parseInt(slotTime.split(':')[0]) + 1).toString().padStart(2, '0')}:${slotTime.split(':')[1]}`,
-          }));
-          await supabase.from('booking_slots').insert(slotRows);
-        }
-      } catch (err) {
-        console.error('[Supabase] booking insert failed:', err);
+      if (bookingErr) {
+        setIsProcessing(false);
+        setBookingError('Something went wrong. Please try again.');
+        return;
+      }
+
+      // Insert slots — unique constraint on (court_id, slot_date, start_time) prevents double booking
+      const slotRows = selectedSlots.map((slotTime) => ({
+        booking_id: bookingRow.id,
+        court_id: courtDbId ?? null,
+        slot_date: selectedDate,
+        start_time: slotTime,
+        end_time: `${(parseInt(slotTime.split(':')[0]) + 1).toString().padStart(2, '0')}:${slotTime.split(':')[1]}`,
+      }));
+      const { error: slotsErr } = await supabase.from('booking_slots').insert(slotRows);
+
+      if (slotsErr) {
+        // Slot was taken by someone else — roll back the booking and send user back
+        await supabase.from('bookings').delete().eq('id', bookingRow.id);
+        setIsProcessing(false);
+        setBookingError('One or more slots were just taken by another player. Please go back and pick different times.');
+        return;
       }
     } else {
-      // Simulate gateway delay in demo mode
       await new Promise((r) => setTimeout(r, 1800));
     }
 
@@ -719,6 +725,20 @@ export default function CheckoutPage({
 
             {/* Core Authorization Action Button */}
             <div>
+              {bookingError && (
+                <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium flex gap-2 items-start">
+                  <span className="shrink-0">⚠</span>
+                  <div>
+                    <p className="font-bold">Booking Failed</p>
+                    <p className="mt-0.5">{bookingError}</p>
+                    {bookingError.includes('slots were just taken') && (
+                      <button onClick={() => onNavigate('booking')} className="mt-1.5 text-red-800 font-bold underline">
+                        Go back and pick new slots
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
               <button
                 type="submit"
                 disabled={!isFormValid() || isProcessing}
