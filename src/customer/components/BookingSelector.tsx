@@ -6,6 +6,7 @@ import { useRealtimeSlots } from '../../hooks/useRealtimeSlots';
 import { isSupabaseEnabled, supabase } from '../../lib/supabase';
 
 interface PricingRange { start: string; end: string; rate: number; courtId: number | null; }
+interface CourtMeta { dbId: number; useGlobal: boolean; defaultPrice: number; name: string; surfaceType: string; }
 
 // Returns the applicable rate for a given time slot from loaded pricing ranges
 const getRateForSlot = (
@@ -131,20 +132,20 @@ export default function BookingSelector({
 }: BookingSelectorProps) {
   const [activePeriodFilter, setActivePeriodFilter] = useState<'All' | 'Morning' | 'Afternoon' | 'Evening' | 'Night'>('All');
   const [pricingRanges, setPricingRanges] = useState<PricingRange[]>([]);
-  const [courtMeta, setCourtMeta] = useState<Record<string, { dbId: number; useGlobal: boolean; defaultPrice: number }>>({});
+  const [courtMeta, setCourtMeta] = useState<Record<string, CourtMeta>>({});
   const sliderDates = getDatesSlider();
 
   // Load courts + pricing from Supabase
   useEffect(() => {
     if (!isSupabaseEnabled || !supabase) return;
     const load = async () => {
-      const { data: courts } = await supabase.from('courts').select('id, slug, default_price, use_global_pricing').eq('status', 'active');
+      const { data: courts } = await supabase.from('courts').select('id, slug, name, surface_type, default_price, use_global_pricing').eq('status', 'active');
       const { data: pricing } = await supabase.from('court_pricing').select('court_id, start_time, end_time, rate');
 
       if (courts) {
         const meta: Record<string, { dbId: number; useGlobal: boolean; defaultPrice: number }> = {};
         courts.forEach((c: any) => {
-          meta[c.slug] = { dbId: c.id, useGlobal: c.use_global_pricing ?? true, defaultPrice: Number(c.default_price) };
+          meta[c.slug] = { dbId: c.id, useGlobal: c.use_global_pricing ?? true, defaultPrice: Number(c.default_price), name: c.name, surfaceType: c.surface_type ?? '' };
         });
         setCourtMeta(meta);
       }
@@ -406,14 +407,14 @@ export default function BookingSelector({
                     >
                       <div className="flex items-center justify-between w-full">
                         <span className="text-[10px] font-mono font-bold uppercase text-slate-500">
-                          {court.type}
+                          {courtMeta[court.id]?.surfaceType || court.type}
                         </span>
                         {isMarkedSelected && (
                           <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                         )}
                       </div>
                       <h4 className="font-sans font-bold text-xs text-slate-900 mt-1 leading-tight shrink-0">
-                        {court.id === 'court-1' ? 'Court 1 (Indoor)' : court.id === 'court-2' ? 'Court 2 (Outdoor)' : court.id === 'court-3' ? 'Court 3 (Indoor)' : 'Court 4 (Outdoor)'}
+                        {courtMeta[court.id]?.name || court.name}
                       </h4>
                       <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-200/60 w-full text-[10px] font-mono">
                         <span className="font-black text-blue-600">₱{courtMeta[court.id]?.defaultPrice ?? court.pricePerHour}/hr</span>
@@ -434,8 +435,8 @@ export default function BookingSelector({
                 />
                 <div className="space-y-1 w-full text-center md:text-left">
                   <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-                    <h3 className="font-sans font-extrabold text-sm text-white">{selectedCourt.name}</h3>
-                    <span className="text-[9px] font-mono bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded font-bold uppercase">{selectedCourt.type} Layout</span>
+                    <h3 className="font-sans font-extrabold text-sm text-white">{courtMeta[selectedCourtId]?.name || selectedCourt.name}</h3>
+                    <span className="text-[9px] font-mono bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded font-bold uppercase">{courtMeta[selectedCourtId]?.surfaceType || selectedCourt.type} Layout</span>
                   </div>
                   <p className="text-xs text-slate-300 leading-relaxed max-w-xl">{selectedCourt.description}</p>
                 </div>
@@ -579,8 +580,8 @@ export default function BookingSelector({
                 referrerPolicy="no-referrer"
               />
               <div className="min-w-0">
-                <span className="text-[9px] font-mono text-slate-400 bg-slate-100 border border-slate-200 px-1 py-0.5 rounded font-bold uppercase">{selectedCourt.type} Facility</span>
-                <h4 className="font-sans font-bold text-xs text-slate-900 mt-1 truncate">{selectedCourt.name}</h4>
+                <span className="text-[9px] font-mono text-slate-400 bg-slate-100 border border-slate-200 px-1 py-0.5 rounded font-bold uppercase">{courtMeta[selectedCourtId]?.surfaceType || selectedCourt.type} Facility</span>
+                <h4 className="font-sans font-bold text-xs text-slate-900 mt-1 truncate">{courtMeta[selectedCourtId]?.name || selectedCourt.name}</h4>
                 <div className="text-[10px] font-mono text-slate-500 mt-0.5">★ {selectedCourt.rating} rating</div>
               </div>
             </div>
