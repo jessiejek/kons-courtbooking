@@ -45,9 +45,10 @@ export default function BookingDetailPage({
             confirmed: 'Upcoming', paid: 'Upcoming',
             completed: 'Past', cancelled: 'Cancelled', pending: 'Upcoming',
           };
+          const courtSlug = COURTS.find(c => c.name === data.court_name)?.id ?? 'court-1';
           setBooking({
             id: data.booking_ref,
-            courtId: 'court-1',
+            courtId: courtSlug,
             courtName: data.court_name ?? '',
             date: data.booking_date,
             startTime: data.start_time?.slice(0, 5) ?? '09:00',
@@ -191,7 +192,7 @@ export default function BookingDetailPage({
                 <h2 className="text-xl font-sans font-black text-[#05140B] mt-1">
                   Booking #{booking.id}
                 </h2>
-                <p className="text-[10px] font-mono text-slate-400 mt-1">Created on October 10, 2026 at 02:30 PM (PST)</p>
+                <p className="text-[10px] font-mono text-slate-400 mt-1">Created on {new Date(booking.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} at {new Date(booking.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
               </div>
 
               <div className="flex flex-col items-end gap-1.5">
@@ -234,7 +235,7 @@ export default function BookingDetailPage({
                   <span className="font-mono text-[10px] uppercase text-slate-400 tracking-wider">SESSION TIMELINE</span>
                   <p className="font-bold text-slate-800 mt-1">{getReadableSelectedDate(booking.date)}</p>
                   <p className="text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded w-fit mt-1 block">
-                    {getFormattedTimeLabel(booking.startTime)} - {getFormattedTimeLabel(booking.endTime)} (2-Hour session)
+                    {getFormattedTimeLabel(booking.startTime)} - {getFormattedTimeLabel(booking.endTime)}
                   </p>
                 </div>
               </div>
@@ -267,7 +268,7 @@ export default function BookingDetailPage({
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs space-y-2.5 text-slate-600">
                 <div className="flex justify-between">
                   <span>Court Fee Base Price</span>
-                  <span className="font-mono text-slate-800 font-semibold">₱600.00</span>
+                  <span className="font-mono text-slate-800 font-semibold">₱{booking.price}.00</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Carbon Racquets & Gear rental</span>
@@ -442,9 +443,9 @@ export default function BookingDetailPage({
               </div>
               
               <div className="p-3 grid grid-cols-4 border-b border-slate-100 text-slate-600">
-                <span className="col-span-2 font-semibold text-slate-800">{booking.courtName} - reservation date {booking.date}</span>
-                <span className="text-center font-mono">2</span>
-                <span className="text-right font-mono">₱550.00</span>
+                <span className="col-span-2 font-semibold text-slate-800">{booking.courtName} - {booking.date}</span>
+                <span className="text-center font-mono">—</span>
+                <span className="text-right font-mono">₱{booking.price}.00</span>
               </div>
 
               <div className="p-3 grid grid-cols-4 border-b border-slate-100 text-[#0063E5] bg-[#E8F1FC]/30">

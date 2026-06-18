@@ -38,7 +38,6 @@ export default function BookingsHistory({
         .select('id, booking_ref, booking_date, start_time, end_time, court_name, customer_name, customer_phone, booking_status, payment_method, total_amount, created_at')
         .order('created_at', { ascending: false });
 
-      // Filter by logged-in user's email so each customer only sees their own bookings
       if (currentUser?.email) {
         query = query.eq('customer_email', currentUser.email);
       }
@@ -51,9 +50,12 @@ export default function BookingsHistory({
           completed: 'Past', cancelled: 'Cancelled', pending: 'Upcoming',
         };
         setSupabaseBookings(
-          data.map((row) => ({
+          data.map((row) => {
+            // Match court image by name
+            const courtSlug = COURTS.find(c => c.name === row.court_name)?.id ?? 'court-1';
+            return {
             id: row.booking_ref,
-            courtId: 'court-1',
+            courtId: courtSlug,
             courtName: row.court_name,
             date: row.booking_date,
             startTime: row.start_time?.slice(0, 5) ?? '09:00',
@@ -65,14 +67,14 @@ export default function BookingsHistory({
             phoneNumber: row.customer_phone ?? '',
             paymentMethod: (row.payment_method === 'card' ? 'Card' : row.payment_method === 'gcash' ? 'GCash' : 'Online Banking') as Booking['paymentMethod'],
             createdAt: row.created_at,
-          }))
+          };})
         );
       }
       setIsFetching(false);
     };
 
     fetchBookings();
-  }, []);
+  }, [currentUser?.email]);
 
   // Use Supabase data when available, fall through to localStorage prop
   const bookings = supabaseBookings ?? localBookings;
