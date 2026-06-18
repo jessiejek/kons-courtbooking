@@ -232,8 +232,7 @@ export default function CheckoutPage({
         booking_id: bookingRow.id,
         court_id: courtDbId ?? null,
         slot_date: selectedDate,
-        start_time: slotTime,
-        end_time: `${(parseInt(slotTime.split(':')[0]) + 1).toString().padStart(2, '0')}:${slotTime.split(':')[1]}`,
+        slot_time: slotTime,
       }));
       const { error: slotsErr } = await supabase.from('booking_slots').insert(slotRows);
 
