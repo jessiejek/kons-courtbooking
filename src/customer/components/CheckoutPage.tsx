@@ -14,6 +14,8 @@ interface CheckoutPageProps {
   role: 'user' | 'admin' | null;
   onLogout: () => void;
   currentUser?: { name: string; email: string; avatar?: string; } | null;
+  finalPrice?: number;
+  courtDbId?: number | null;
 }
 
 export default function CheckoutPage({
@@ -27,6 +29,8 @@ export default function CheckoutPage({
   role,
   currentUser,
   onLogout,
+  finalPrice: finalPriceProp,
+  courtDbId,
 }: CheckoutPageProps) {
   // User Credentials
   const [fullName, setFullName] = useState('');
@@ -109,12 +113,12 @@ export default function CheckoutPage({
     }
   };
 
-  // Pricing math
+  // Pricing math — use live time-based price from BookingSelector if available
   const hoursCount = selectedSlots.length;
-  const courtPrice = hoursCount * selectedCourt.pricePerHour;
-  const loyaltySavings = hoursCount > 2 ? 50 : 0;
+  const courtPrice = finalPriceProp ?? hoursCount * selectedCourt.pricePerHour;
+  const loyaltySavings = 0; // already applied in BookingSelector finalPrice
   const processingFee = paymentMethod === 'Card' ? 25 : 0;
-  const totalDue = Math.max(0, courtPrice - loyaltySavings + processingFee);
+  const totalDue = Math.max(0, courtPrice + processingFee);
 
   const formatTimer = (sec: number) => {
     const m = Math.floor(sec / 60);
@@ -205,7 +209,7 @@ export default function CheckoutPage({
             booking_date: selectedDate,
             start_time: sorted[0],
             end_time: endTime,
-            court_id: null, // numeric court ID not available in customer data model
+            court_id: courtDbId ?? null,
             court_name: selectedCourt.name,
             customer_name: fullName,
             customer_phone: phoneNumber,
@@ -223,7 +227,7 @@ export default function CheckoutPage({
           // Insert one slot row per selected hour
           const slotRows = selectedSlots.map((slotTime) => ({
             booking_id: bookingRow.id,
-            court_id: null,
+            court_id: courtDbId ?? null,
             slot_date: selectedDate,
             start_time: slotTime,
             end_time: `${(parseInt(slotTime.split(':')[0]) + 1).toString().padStart(2, '0')}:${slotTime.split(':')[1]}`,
@@ -692,16 +696,9 @@ export default function CheckoutPage({
               {/* Pricing billing list */}
               <div className="space-y-2 text-xs text-slate-600">
                 <div className="flex justify-between">
-                  <span>Court Hourly Fee ({hoursCount} hr{hoursCount > 1 ? 's' : ''})</span>
+                  <span>Court Fee ({hoursCount} hr{hoursCount > 1 ? 's' : ''})</span>
                   <span className="font-mono text-slate-900">₱{courtPrice}</span>
                 </div>
-                
-                {loyaltySavings > 0 && (
-                  <div className="flex justify-between text-emerald-600">
-                    <span>Discount (Multi-hr Booking)</span>
-                    <span className="font-mono">-₱{loyaltySavings}</span>
-                  </div>
-                )}
 
                 <div className="flex justify-between">
                   <span>Carbon Paddles Selection</span>

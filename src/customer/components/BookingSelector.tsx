@@ -59,6 +59,8 @@ interface BookingSelectorProps {
   role: 'user' | 'admin' | null;
   onLogout: () => void;
   currentUser?: { name: string; email: string; avatar?: string; } | null;
+  onFinalPriceChange?: (price: number) => void;
+  onCourtDbIdChange?: (id: number | null) => void;
 }
 
 // Generate the dates slider starting from today
@@ -129,6 +131,8 @@ export default function BookingSelector({
   role,
   currentUser,
   onLogout,
+  onFinalPriceChange,
+  onCourtDbIdChange,
 }: BookingSelectorProps) {
   const [activePeriodFilter, setActivePeriodFilter] = useState<'All' | 'Morning' | 'Afternoon' | 'Evening' | 'Night'>('All');
   const [pricingRanges, setPricingRanges] = useState<PricingRange[]>([]);
@@ -143,11 +147,13 @@ export default function BookingSelector({
       const { data: pricing } = await supabase.from('court_pricing').select('court_id, start_time, end_time, rate');
 
       if (courts) {
-        const meta: Record<string, { dbId: number; useGlobal: boolean; defaultPrice: number }> = {};
+        const meta: Record<string, CourtMeta> = {};
         courts.forEach((c: any) => {
           meta[c.slug] = { dbId: c.id, useGlobal: c.use_global_pricing ?? true, defaultPrice: Number(c.default_price), name: c.name, surfaceType: c.surface_type ?? '' };
         });
         setCourtMeta(meta);
+        const current = courts.find((c: any) => c.slug === selectedCourtId);
+        if (current) onCourtDbIdChange?.(current.id);
       }
 
       if (pricing) {
@@ -226,6 +232,10 @@ export default function BookingSelector({
   const courtFee = selectedSlots.reduce((sum, time) => sum + getSlotRate(time), 0);
   const discount = totalHours > 2 ? 50 : 0;
   const finalPrice = Math.max(0, courtFee - discount);
+
+  // Keep parent in sync
+  useEffect(() => { onFinalPriceChange?.(finalPrice); }, [finalPrice]);
+  useEffect(() => { onCourtDbIdChange?.(courtMeta[selectedCourtId]?.dbId ?? null); }, [selectedCourtId, courtMeta]);
 
   // Formats selected times interval for summary display
   const getSelectedTimeRangeLabel = () => {

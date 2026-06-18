@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import { Screen, Booking, Court } from './types';
 import { COURTS } from './data';
@@ -11,6 +11,7 @@ import BookingDetailPage from './components/BookingDetailPage';
 import TechnologyModal from './components/TechnologyModal';
 import LoginModal from '../LoginModal';
 import { CurrentUser } from '../App';
+import { supabase, isSupabaseEnabled } from '../lib/supabase';
 
 interface Props {
   role: 'user' | 'admin' | null;
@@ -38,6 +39,22 @@ export default function CustomerApp({ role, onLogin, onLogout, currentUser }: Pr
   const [lastCommittedBooking, setLastCommittedBooking] = useState<Booking | null>(null);
   const [techModalOpen, setTechModalOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [finalPrice, setFinalPrice] = useState(0);
+  const [courtDbId, setCourtDbId] = useState<number | null>(null);
+  // Live courts from Supabase — keyed by slug
+  const [liveCourts, setLiveCourts] = useState<Record<string, { name: string; type: string; dbId: number; pricePerHour: number }>>({});
+
+  useEffect(() => {
+    if (!isSupabaseEnabled || !supabase) return;
+    supabase.from('courts').select('id, slug, name, surface_type, default_price').eq('status', 'active').then(({ data }) => {
+      if (!data) return;
+      const map: typeof liveCourts = {};
+      data.forEach((c: any) => {
+        map[c.slug] = { name: c.name, type: c.surface_type === 'indoor' ? 'Indoor' : 'Outdoor', dbId: c.id, pricePerHour: Number(c.default_price) };
+      });
+      setLiveCourts(map);
+    });
+  }, []);
 
   const handleCompleteBooking = (newBooking: Booking) => {
     setLastCommittedBooking(newBooking);
@@ -45,8 +62,12 @@ export default function CustomerApp({ role, onLogin, onLogout, currentUser }: Pr
     setCartTimeLeft(600);
   };
 
-  const getActiveCourtDetails = (): Court =>
-    COURTS.find((c) => c.id === selectedCourtId) || COURTS[0];
+  const getActiveCourtDetails = (): Court => {
+    const static_ = COURTS.find((c) => c.id === selectedCourtId) || COURTS[0];
+    const live = liveCourts[selectedCourtId];
+    if (!live) return static_;
+    return { ...static_, name: live.name, type: live.type as Court['type'], pricePerHour: live.pricePerHour };
+  };
 
   const handleNavigate = (targetScreen: Screen) => {
     navigate(SCREEN_TO_PATH[targetScreen]);
@@ -84,6 +105,8 @@ export default function CustomerApp({ role, onLogin, onLogout, currentUser }: Pr
             setSelectedSlots={setSelectedSlots}
             cartTimeLeft={cartTimeLeft}
             setCartTimeLeft={setCartTimeLeft}
+            onFinalPriceChange={setFinalPrice}
+            onCourtDbIdChange={setCourtDbId}
           />
         } />
 
@@ -95,6 +118,8 @@ export default function CustomerApp({ role, onLogin, onLogout, currentUser }: Pr
             selectedSlots={selectedSlots}
             cartTimeLeft={cartTimeLeft}
             onCompleteBooking={handleCompleteBooking}
+            finalPrice={finalPrice}
+            courtDbId={courtDbId}
           />
         } />
 

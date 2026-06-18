@@ -123,8 +123,8 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
       id: row.id,
       name: row.name,
       surfaceType: row.surface_type ?? 'indoor',
-      opensAt: '06:00',
-      closesAt: '22:00',
+      opensAt: row.opens_at ?? '06:00',
+      closesAt: row.closes_at ?? '22:00',
       defaultPrice: Number(row.default_price ?? 300),
       status: row.status ?? 'active',
       pricing: {},
@@ -147,6 +147,8 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
     const row = {
       name: court.name,
       surface_type: court.surfaceType,
+      opens_at: court.opensAt,
+      closes_at: court.closesAt,
       default_price: court.defaultPrice,
       status: court.status,
     };
