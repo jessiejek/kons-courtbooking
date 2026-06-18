@@ -8,7 +8,8 @@ import {
   AlertOctagon,
   CheckCircle2,
   Hammer,
-  EyeOff
+  EyeOff,
+  Loader2,
 } from 'lucide-react';
 import { Court, CourtStatus, CourtSurface, DayOfWeek } from '../types';
 import { createDefaultPricingForDay } from '../data';
@@ -18,7 +19,7 @@ import ConfirmModal, { ConfirmOptions } from '../../components/ConfirmModal';
 interface AddEditCourtViewProps {
   editCourtId: number | 'new' | null;
   courts: Court[];
-  onSaveCourt: (court: Court) => void;
+  onSaveCourt: (court: Court) => Promise<string | null>;
   onDeleteCourt: (courtId: number) => void;
   onCancel: () => void;
 }
@@ -63,7 +64,9 @@ export default function AddEditCourtView({
     }
   }, [existingCourt, editCourtId]);
 
-  const handleSubmit = (e: FormEvent) => {
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
     if (!name.trim()) {
@@ -71,10 +74,9 @@ export default function AddEditCourtView({
       return;
     }
 
-    // Default pricing structure for Mon-Sun
     const days: DayOfWeek[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const initialPricing = existingCourt 
-      ? existingCourt.pricing 
+    const initialPricing = existingCourt
+      ? existingCourt.pricing
       : days.reduce((acc, d) => {
           acc[d] = createDefaultPricingForDay(d);
           return acc;
@@ -88,10 +90,18 @@ export default function AddEditCourtView({
       closesAt,
       defaultPrice: Number(defaultPrice),
       status,
-      pricing: initialPricing
+      pricing: initialPricing,
     };
 
-    onSaveCourt(updatedCourt);
+    setIsSaving(true);
+    const err = await onSaveCourt(updatedCourt);
+    setIsSaving(false);
+
+    if (err) {
+      toast('error', 'Save failed', err);
+      return;
+    }
+
     toast('success', existingCourt ? 'Court updated' : 'Court created', `${name} has been saved.`);
     setTimeout(onCancel, 800);
   };
@@ -343,10 +353,11 @@ export default function AddEditCourtView({
               </span>
               <button
                 type="submit"
-                className="bg-primary hover:bg-opacity-95 text-white px-10 py-3 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm flex items-center gap-2 active:scale-95 transition-all"
+                disabled={isSaving}
+                className="bg-primary hover:bg-opacity-95 text-white px-10 py-3 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm flex items-center gap-2 active:scale-95 transition-all disabled:opacity-60"
               >
-                <Save className="w-4 h-4" />
-                <span>Save Changes</span>
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
               </button>
             </div>
           </div>

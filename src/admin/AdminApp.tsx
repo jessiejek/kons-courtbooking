@@ -28,7 +28,7 @@ function CourtEditRoute({
   onDeleteCourt,
 }: {
   courts: Court[];
-  onSaveCourt: (court: Court) => void;
+  onSaveCourt: (court: Court) => Promise<string | null>;
   onDeleteCourt: (id: number) => void;
 }) {
   const { id } = useParams<{ id: string }>();
@@ -143,7 +143,7 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
     setBookings((data ?? []).map(mapRow));
   };
 
-  const handleSaveCourt = async (court: Court) => {
+  const handleSaveCourt = async (court: Court): Promise<string | null> => {
     const row = {
       name: court.name,
       surface_type: court.surfaceType,
@@ -152,7 +152,10 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
       default_price: court.defaultPrice,
       status: court.status,
     };
-    if (!isSupabaseEnabled || !supabase) { setCourts(prev => prev.some(c => c.id === court.id) ? prev.map(c => c.id === court.id ? court : c) : [...prev, court]); return; }
+    if (!isSupabaseEnabled || !supabase) {
+      setCourts(prev => prev.some(c => c.id === court.id) ? prev.map(c => c.id === court.id ? court : c) : [...prev, court]);
+      return null;
+    }
     const exists = courts.some(c => c.id === court.id);
     let error;
     if (exists) {
@@ -160,11 +163,9 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
     } else {
       ({ error } = await supabase.from('courts').insert(row));
     }
-    if (error) {
-      toast('error', 'Save failed', error.message);
-      return;
-    }
+    if (error) return error.message;
     await loadCourts();
+    return null;
   };
 
   const handleDeleteCourt = async (courtId: number) => {
