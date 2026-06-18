@@ -39,6 +39,7 @@ export default function AddEditCourtView({
   const [surfaceType, setSurfaceType] = useState<CourtSurface>('indoor');
   const [opensAt, setOpensAt] = useState('06:00');
   const [closesAt, setClosesAt] = useState('22:00');
+  const [useCustomSchedule, setUseCustomSchedule] = useState(false);
   const [defaultPrice, setDefaultPrice] = useState(350);
   const [status, setStatus] = useState<CourtStatus>('active');
   const { toasts, toast, removeToast } = useToast();
@@ -194,39 +195,58 @@ export default function AddEditCourtView({
             Availability &amp; Pricing Defaults
           </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Opens At */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-                Opens At
-              </label>
-              <div className="relative">
-                <Clock className="w-4 h-4 text-outline absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="time"
-                  value={opensAt}
-                  onChange={(e) => setOpensAt(e.target.value)}
-                  className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg pl-10 pr-3 p-3 text-sm font-bold focus:outline-none focus:border-primary font-mono"
-                />
-              </div>
+          {/* Schedule toggle */}
+          <div className="flex items-center justify-between bg-surface-container-low/40 border border-outline-variant rounded-xl px-4 py-3">
+            <div>
+              <p className="text-sm font-bold text-on-surface">Custom Schedule</p>
+              <p className="text-xs text-on-surface-variant mt-0.5">
+                {useCustomSchedule ? 'This court uses its own opening hours.' : 'Following global schedule (06:00 AM – 10:00 PM).'}
+              </p>
             </div>
-
-            {/* Closes At */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-                Closes At
-              </label>
-              <div className="relative">
-                <Clock className="w-4 h-4 text-outline absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="time"
-                  value={closesAt}
-                  onChange={(e) => setClosesAt(e.target.value)}
-                  className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg pl-10 pr-3 p-3 text-sm font-bold focus:outline-none focus:border-primary font-mono"
-                />
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => setUseCustomSchedule(v => !v)}
+              className={`relative w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none ${useCustomSchedule ? 'bg-primary' : 'bg-outline-variant'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${useCustomSchedule ? 'translate-x-6' : 'translate-x-0'}`} />
+            </button>
           </div>
+
+          {useCustomSchedule && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Opens At */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                  Opens At
+                </label>
+                <div className="relative">
+                  <Clock className="w-4 h-4 text-outline absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="time"
+                    value={opensAt}
+                    onChange={(e) => setOpensAt(e.target.value)}
+                    className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg pl-10 pr-3 p-3 text-sm font-bold focus:outline-none focus:border-primary font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Closes At */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                  Closes At
+                </label>
+                <div className="relative">
+                  <Clock className="w-4 h-4 text-outline absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="time"
+                    value={closesAt}
+                    onChange={(e) => setClosesAt(e.target.value)}
+                    className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg pl-10 pr-3 p-3 text-sm font-bold focus:outline-none focus:border-primary font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Hourly price rule */}
           <div className="space-y-1.5">
