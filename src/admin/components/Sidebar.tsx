@@ -6,7 +6,8 @@ import {
   Calendar,
   Settings,
   HelpCircle,
-  Plus
+  Plus,
+  LogOut
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -108,26 +109,30 @@ export default function Sidebar({ onNewBookingClick, newBookingCount = 0, onClea
         </div>
 
         {/* Club Manager Profile Section */}
-        <div className="flex items-center justify-between px-3 py-3 mt-4 border-t border-outline-variant/60">
-          <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-10 h-10 rounded-lg overflow-hidden bg-surface-container-high border border-outline-variant shrink-0">
+        <div className="mt-3 border-t border-outline-variant/60 pt-3 space-y-1">
+          <div className="flex items-center gap-3 px-3 py-2 overflow-hidden">
+            <div className="w-9 h-9 rounded-lg overflow-hidden bg-surface-container-high border border-outline-variant shrink-0">
               {currentUser?.avatar
                 ? <img className="w-full h-full object-cover" referrerPolicy="no-referrer" src={currentUser.avatar} alt="avatar" />
-                : <div className="w-full h-full flex items-center justify-center bg-primary text-on-primary font-bold text-base">{currentUser?.name?.[0]?.toUpperCase() ?? 'A'}</div>
+                : <div className="w-full h-full flex items-center justify-center bg-primary text-on-primary font-bold text-sm">{currentUser?.name?.[0]?.toUpperCase() ?? 'A'}</div>
               }
             </div>
-            <div className="overflow-hidden">
+            <div className="overflow-hidden flex-1 min-w-0">
               <p className="font-semibold text-xs text-on-surface leading-tight truncate">
                 {currentUser?.name ?? 'Admin'}
               </p>
-              <p className="text-[10px] uppercase font-bold text-outline leading-tight mt-0.5 tracking-wider">
-                {currentUser?.email ? currentUser.email.split('@')[0] : 'Club Manager'}
+              <p className="text-[10px] text-outline leading-tight mt-0.5 truncate">
+                {currentUser?.email ?? 'Club Manager'}
               </p>
             </div>
           </div>
           {onLogout && (
-            <button onClick={onLogout} className="text-[10px] text-outline hover:text-error transition-colors uppercase font-bold tracking-wider shrink-0">
-              Out
+            <button
+              onClick={() => { if (window.confirm('Sign out of admin panel?')) onLogout(); }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50 transition-all rounded-lg text-left"
+            >
+              <LogOut className="w-[18px] h-[18px]" />
+              <span>Sign Out</span>
             </button>
           )}
         </div>
