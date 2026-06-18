@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Plus, Trash2, Save, Globe, Lock, Unlock, ChevronDown, ChevronUp, AlertTriangle, Check
+  Plus, Trash2, Save, Globe, Lock, Unlock, ChevronDown, ChevronUp, AlertTriangle, Check, Loader2
 } from 'lucide-react';
 import { Court, DayOfWeek, TimePriceRange } from '../types';
 import { useToast, ToastContainer } from '../../components/Toast';
+import { supabase, isSupabaseEnabled } from '../../lib/supabase';
 
 // ── Types ────────────────────────────────────────────────────
 export interface GlobalPricing {
@@ -124,75 +125,189 @@ export default function CourtsPricingView({
 }: CourtsPricingViewProps) {
   const { toasts, toast, removeToast } = useToast();
 
-  // Global pricing state
   const [globalRanges, setGlobalRanges] = useState<TimePriceRange[]>(DEFAULT_GLOBAL_RANGES);
   const [globalDirty, setGlobalDirty] = useState(false);
   const [editingGlobal, setEditingGlobal] = useState(false);
+  const [savingGlobal, setSavingGlobal] = useState(false);
 
-  // Per-court override state: courtId → { useGlobal, ranges }
   const [courtOverrides, setCourtOverrides] = useState<Record<number, CourtPricingOverride>>(() =>
     Object.fromEntries(courts.map(c => [c.id, { courtId: c.id, useGlobal: true, ranges: [...DEFAULT_GLOBAL_RANGES] }]))
   );
-
-  // Which court's override panel is expanded
+  const [savingCourt, setSavingCourt] = useState<number | null>(null);
   const [expandedCourt, setExpandedCourt] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // ── Load from Supabase on mount ──────────────────────────────
+  useEffect(() => {
+    if (!isSupabaseEnabled || !supabase) { setLoading(false); return; }
+    const load = async () => {
+      setLoading(true);
+
+      // Load global pricing (court_id is null)
+      const { data: globalData } = await supabase
+        .from('court_pricing')
+        .select('*')
+        .is('court_id', null)
+        .order('start_time');
+
+      if (globalData && globalData.length > 0) {
+        const loaded = globalData.map((r: any) => ({
+          id: r.id,
+          start: r.start_time.slice(0, 5),
+          end: r.end_time.slice(0, 5),
+          rate: Number(r.rate),
+        }));
+        setGlobalRanges(loaded);
+      }
+
+      // Load per-court overrides + use_global_pricing flag
+      const { data: courtData } = await supabase
+        .from('courts')
+        .select('id, use_global_pricing');
+
+      const { data: priceData } = await supabase
+        .from('court_pricing')
+        .select('*')
+        .not('court_id', 'is', null)
+        .order('start_time');
+
+      if (courtData) {
+        const overrides: Record<number, CourtPricingOverride> = {};
+        courtData.forEach((c: any) => {
+          const courtRanges = (priceData ?? [])
+            .filter((r: any) => r.court_id === c.id)
+            .map((r: any) => ({
+              id: r.id,
+              start: r.start_time.slice(0, 5),
+              end: r.end_time.slice(0, 5),
+              rate: Number(r.rate),
+            }));
+          overrides[c.id] = {
+            courtId: c.id,
+            useGlobal: c.use_global_pricing ?? true,
+            ranges: courtRanges.length > 0 ? courtRanges : [...DEFAULT_GLOBAL_RANGES],
+          };
+        });
+        setCourtOverrides(overrides);
+      }
+
+      setLoading(false);
+    };
+    load();
+  }, [courts.length]);
+
+  // ── Save global pricing ──────────────────────────────────────
+  const handleSaveGlobal = async () => {
+    setSavingGlobal(true);
+    if (isSupabaseEnabled && supabase) {
+      // Delete existing global rows then re-insert
+      await supabase.from('court_pricing').delete().is('court_id', null);
+      const rows = globalRanges.map(r => ({
+        court_id: null,
+        day: 'Mon' as const, // placeholder — global pricing applies to all days
+        start_time: r.start,
+        end_time: r.end,
+        rate: r.rate,
+      }));
+      const { error } = await supabase.from('court_pricing').insert(rows);
+      if (error) { toast('error', 'Failed to save', error.message); setSavingGlobal(false); return; }
+    }
+
+    // Propagate to courts still using global in local state
+    setCourtOverrides(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(id => {
+        const cid = Number(id);
+        if (next[cid].useGlobal) next[cid] = { ...next[cid], ranges: [...globalRanges] };
+      });
+      return next;
+    });
+
+    setGlobalDirty(false);
+    setEditingGlobal(false);
+    setSavingGlobal(false);
+    toast('success', 'Global pricing saved', 'All courts on global pricing have been updated.');
+  };
 
   const handleGlobalChange = (ranges: TimePriceRange[]) => {
     setGlobalRanges(ranges);
     setGlobalDirty(true);
   };
 
-  const handleSaveGlobal = () => {
-    // Propagate to all courts that are still using global
-    setCourtOverrides(prev => {
-      const next = { ...prev };
-      Object.keys(next).forEach(id => {
-        const cid = Number(id);
-        if (next[cid].useGlobal) {
-          next[cid] = { ...next[cid], ranges: [...globalRanges] };
-        }
-      });
-      return next;
-    });
-    setGlobalDirty(false);
-    setEditingGlobal(false);
-    toast('success', 'Global pricing saved', 'All courts using global pricing have been updated.');
-  };
+  // ── Toggle court override ────────────────────────────────────
+  const handleToggleOverride = async (courtId: number) => {
+    const current = courtOverrides[courtId];
+    const useGlobal = !current.useGlobal;
 
-  const handleToggleOverride = (courtId: number) => {
-    setCourtOverrides(prev => {
-      const current = prev[courtId];
-      const useGlobal = !current.useGlobal;
-      return {
-        ...prev,
-        [courtId]: {
-          ...current,
-          useGlobal,
-          ranges: useGlobal ? [...globalRanges] : [...current.ranges],
-        },
-      };
-    });
-    if (!courtOverrides[courtId].useGlobal === true) {
-      toast('info', 'Reverted to global pricing');
+    setCourtOverrides(prev => ({
+      ...prev,
+      [courtId]: { ...prev[courtId], useGlobal, ranges: useGlobal ? [...globalRanges] : [...current.ranges] },
+    }));
+
+    if (isSupabaseEnabled && supabase) {
+      await supabase.from('courts').update({ use_global_pricing: useGlobal }).eq('id', courtId);
     }
+
+    toast('info', useGlobal ? 'Reverted to global pricing' : 'Custom pricing enabled for this court');
   };
 
   const handleCourtRangeChange = (courtId: number, ranges: TimePriceRange[]) => {
     setCourtOverrides(prev => ({ ...prev, [courtId]: { ...prev[courtId], ranges } }));
   };
 
-  const handleSaveCourtOverride = (courtId: number) => {
+  // ── Save per-court override ──────────────────────────────────
+  const handleSaveCourtOverride = async (courtId: number) => {
     const court = courts.find(c => c.id === courtId);
+    const override = courtOverrides[courtId];
+    setSavingCourt(courtId);
+
+    if (isSupabaseEnabled && supabase) {
+      // Delete existing per-court rows
+      await supabase.from('court_pricing').delete().eq('court_id', courtId);
+
+      // Insert new ranges
+      const rows = override.ranges.map(r => ({
+        court_id: courtId,
+        day: 'Mon' as const, // placeholder — applies to all days
+        start_time: r.start,
+        end_time: r.end,
+        rate: r.rate,
+      }));
+
+      if (rows.length > 0) {
+        const { error } = await supabase.from('court_pricing').insert(rows);
+        if (error) { toast('error', 'Failed to save', error.message); setSavingCourt(null); return; }
+      }
+
+      // Mark court as using custom pricing
+      await supabase.from('courts').update({ use_global_pricing: false }).eq('id', courtId);
+    }
+
+    setSavingCourt(null);
     toast('success', 'Court pricing saved', `Custom pricing saved for ${court?.name}.`);
   };
 
-  const handleResetCourt = (courtId: number) => {
+  // ── Reset court to global ────────────────────────────────────
+  const handleResetCourt = async (courtId: number) => {
     setCourtOverrides(prev => ({
       ...prev,
       [courtId]: { ...prev[courtId], useGlobal: true, ranges: [...globalRanges] },
     }));
+
+    if (isSupabaseEnabled && supabase) {
+      await supabase.from('courts').update({ use_global_pricing: true }).eq('id', courtId);
+      await supabase.from('court_pricing').delete().eq('court_id', courtId);
+    }
+
     toast('info', 'Reset to global pricing');
   };
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-24 gap-3 text-on-surface-variant">
+      <Loader2 className="w-5 h-5 animate-spin" />
+      <span className="text-sm font-medium">Loading pricing…</span>
+    </div>
+  );
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -272,9 +387,11 @@ export default function CourtsPricingView({
                 </button>
                 <button
                   onClick={handleSaveGlobal}
-                  className="flex items-center gap-2 bg-primary text-on-primary px-6 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm hover:bg-opacity-95 transition-all"
+                  disabled={savingGlobal}
+                  className="flex items-center gap-2 bg-primary text-on-primary px-6 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm hover:bg-opacity-95 transition-all disabled:opacity-60"
                 >
-                  <Save className="w-3.5 h-3.5" /> Save Global Pricing
+                  {savingGlobal ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  Save Global Pricing
                 </button>
               </div>
             </div>
@@ -388,9 +505,11 @@ export default function CourtsPricingView({
                         </button>
                         <button
                           onClick={() => handleSaveCourtOverride(court.id)}
-                          className="flex items-center gap-2 bg-primary text-on-primary px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm hover:bg-opacity-95 transition-all"
+                          disabled={savingCourt === court.id}
+                          className="flex items-center gap-2 bg-primary text-on-primary px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm hover:bg-opacity-95 transition-all disabled:opacity-60"
                         >
-                          <Save className="w-3.5 h-3.5" /> Save Court Pricing
+                          {savingCourt === court.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                          Save Court Pricing
                         </button>
                       </div>
                     </div>
