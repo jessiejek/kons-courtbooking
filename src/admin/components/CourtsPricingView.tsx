@@ -198,13 +198,19 @@ export default function CourtsPricingView({
 
   // ── Save global pricing ──────────────────────────────────────
   const handleSaveGlobal = async () => {
+    // Validate: end must be after start
+    for (const r of globalRanges) {
+      if (r.start >= r.end) {
+        toast('error', 'Invalid time range', `"${r.start} → ${r.end}" — end time must be after start time.`);
+        return;
+      }
+    }
     setSavingGlobal(true);
     if (isSupabaseEnabled && supabase) {
-      // Delete existing global rows then re-insert
       await supabase.from('court_pricing').delete().is('court_id', null);
       const rows = globalRanges.map(r => ({
         court_id: null,
-        day: 'Mon' as const, // placeholder — global pricing applies to all days
+        day: 'Mon' as const,
         start_time: r.start,
         end_time: r.end,
         rate: r.rate,
@@ -259,6 +265,12 @@ export default function CourtsPricingView({
   const handleSaveCourtOverride = async (courtId: number) => {
     const court = courts.find(c => c.id === courtId);
     const override = courtOverrides[courtId];
+    for (const r of override.ranges) {
+      if (r.start >= r.end) {
+        toast('error', 'Invalid time range', `"${r.start} → ${r.end}" — end time must be after start time.`);
+        return;
+      }
+    }
     setSavingCourt(courtId);
 
     if (isSupabaseEnabled && supabase) {
