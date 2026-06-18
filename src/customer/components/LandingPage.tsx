@@ -78,26 +78,21 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
     <div className="bg-[#f9f9f7] text-[#1a1c1b] min-h-screen font-sans overflow-x-hidden">
 
       {/* ── STICKY NAV ─────────────────────────────────────────── */}
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled
-          ? 'bg-white/98 backdrop-blur-md shadow-[0_1px_0_0_rgba(0,0,0,0.08)]'
-          : 'bg-transparent'
+          ? 'bg-white shadow-[0_1px_0_0_rgba(0,0,0,0.08)]'
+          : 'bg-[#111412]'
       }`}>
         <div className="max-w-7xl mx-auto px-6 h-18 flex items-center justify-between" style={{ height: '72px' }}>
 
           {/* Logo */}
-          <button onClick={() => onNavigate('landing')} className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-xl bg-[#00694c] flex items-center justify-center shadow-md">
-              <span className="text-white font-black text-base leading-none">S</span>
+          <button onClick={() => onNavigate('landing')} className="flex items-center gap-2.5 group">
+            <div className="w-8 h-8 rounded-lg bg-[#00694c] flex items-center justify-center shadow-md shrink-0">
+              <span className="text-white font-black text-sm leading-none">S</span>
             </div>
-            <div className="leading-none">
-              <span className={`font-extrabold text-sm uppercase tracking-tight block transition-colors ${scrolled ? 'text-[#1a1c1b]' : 'text-white'}`}>
-                Sunshine
-              </span>
-              <span className="font-semibold text-[9px] uppercase tracking-widest text-[#00694c] block">
-                Pickleball Courts
-              </span>
-            </div>
+            <span className={`font-extrabold text-base tracking-tight transition-colors ${scrolled ? 'text-[#1a1c1b]' : 'text-white'}`}>
+              Sunshine <span className={`font-medium ${scrolled ? 'text-[#6d7a73]' : 'text-white/60'}`}>Pickleball</span>
+            </span>
           </button>
 
           {/* Desktop nav links */}
@@ -571,13 +566,12 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
 
           <div className="md:col-span-1 space-y-4">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-[#00694c] flex items-center justify-center">
-                <span className="text-white font-black text-base">S</span>
+              <div className="w-8 h-8 rounded-lg bg-[#00694c] flex items-center justify-center shrink-0">
+                <span className="text-white font-black text-sm">S</span>
               </div>
-              <div>
-                <span className="block text-white font-extrabold text-sm uppercase tracking-tight">Sunshine</span>
-                <span className="block text-[#00694c] text-[9px] font-bold uppercase tracking-widest">Pickleball Courts</span>
-              </div>
+              <span className="text-white font-extrabold text-base tracking-tight">
+                Sunshine <span className="font-medium text-white/50">Pickleball</span>
+              </span>
             </div>
             <p className="text-xs leading-relaxed">
               Metro Manila's premier boutique pickleball facility. International-standard courts, real-time online booking, and a world-class player experience.
