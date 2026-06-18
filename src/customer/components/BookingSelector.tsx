@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Calendar as CalendarIcon, Clock, ShieldCheck, HelpCircle, ChevronLeft, ChevronRight, Info, AlertTriangle } from 'lucide-react';
 import { Court, TimeSlot } from '../types';
 import { COURTS, TIME_SLOTS_RAW } from '../data';
+import { useRealtimeSlots } from '../../hooks/useRealtimeSlots';
+import { isSupabaseEnabled } from '../../lib/supabase';
 
 interface BookingSelectorProps {
   onNavigate: (screen: 'landing' | 'booking' | 'checkout' | 'confirmed' | 'bookings-list' | 'booking-detail') => void;
@@ -16,6 +18,7 @@ interface BookingSelectorProps {
   onOpenLogin: () => void;
   role: 'user' | 'admin' | null;
   onLogout: () => void;
+  currentUser?: { name: string; email: string; avatar?: string; } | null;
 }
 
 // Generate the dates slider starting from today
@@ -84,11 +87,20 @@ export default function BookingSelector({
   setCartTimeLeft,
   onOpenLogin,
   role,
+  currentUser,
   onLogout,
 }: BookingSelectorProps) {
   const [activePeriodFilter, setActivePeriodFilter] = useState<'All' | 'Morning' | 'Afternoon' | 'Evening' | 'Night'>('All');
   const sliderDates = getDatesSlider();
   const selectedCourt = COURTS.find(c => c.id === selectedCourtId) || COURTS[0];
+
+  // Live slot availability from Supabase — overrides mock data when connected
+  const realtimeBookedSlots = useRealtimeSlots(selectedCourtId, selectedDate);
+
+  const isSlotBooked = (time: string): boolean => {
+    if (isSupabaseEnabled) return realtimeBookedSlots.has(time);
+    return getBookedStatusForSlot(time, selectedCourtId, selectedDate).isBooked;
+  };
 
   // Cart Hold countdown timer logic
   useEffect(() => {
@@ -193,9 +205,14 @@ export default function BookingSelector({
             My Bookings
           </button>
           {role ? (
-            <button onClick={onLogout} className="text-slate-300 hover:text-white transition-colors py-1 px-3 bg-zinc-800/80 rounded">
-              Log out
-            </button>
+            <div className="flex items-center gap-2">
+              {currentUser?.avatar
+                ? <img src={currentUser.avatar} referrerPolicy="no-referrer" className="w-7 h-7 rounded-full border border-slate-600 object-cover" />
+                : <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-[11px] font-bold">{currentUser?.name?.[0]?.toUpperCase() ?? 'U'}</div>
+              }
+              <span className="text-slate-300 text-xs hidden md:block max-w-[120px] truncate">{currentUser?.name}</span>
+              <button onClick={onLogout} className="text-slate-400 hover:text-white py-1 px-2 bg-zinc-800/80 rounded text-xs">Sign out</button>
+            </div>
           ) : (
             <button onClick={onOpenLogin} className="text-slate-300 hover:text-white transition-colors py-1 px-3 border border-slate-600 hover:border-slate-400 rounded">
               Log in
@@ -386,17 +403,20 @@ export default function BookingSelector({
               {/* Time grid table */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
                 {filteredSlots.map((slot) => {
-                  const bookedInfo = getBookedStatusForSlot(slot.time, selectedCourtId, selectedDate);
+                  const slotBooked = isSlotBooked(slot.time);
+                  // Keep mock booker name for demo mode; in realtime mode just say "Booked"
+                  const mockInfo = isSupabaseEnabled ? null : getBookedStatusForSlot(slot.time, selectedCourtId, selectedDate);
+                  const bookerLabel = mockInfo?.bookerName ?? 'Booked';
                   const isSlotCurrentlySelected = selectedSlots.includes(slot.time);
-                  
+
                   return (
                     <button
                       key={slot.time}
-                      disabled={bookedInfo.isBooked}
-                      onClick={() => handleSlotToggle(slot.time, bookedInfo.isBooked)}
+                      disabled={slotBooked}
+                      onClick={() => handleSlotToggle(slot.time, slotBooked)}
                       className={`flex items-center justify-between p-3 rounded-lg border transition-all text-left relative overflow-hidden ${
-                        bookedInfo.isBooked
-                          ? 'bg-zinc-100 border-zinc-200 text-slate-400 cursor-not-allowed opacity-60' 
+                        slotBooked
+                          ? 'bg-zinc-100 border-zinc-200 text-slate-400 cursor-not-allowed opacity-60'
                           : isSlotCurrentlySelected
                             ? 'bg-blue-600 border-blue-600 text-white font-bold shadow-md ring-2 ring-blue-600/10'
                             : 'bg-white hover:border-slate-800 border-slate-200 text-slate-800 cursor-pointer'
@@ -407,11 +427,11 @@ export default function BookingSelector({
                           {slot.label}
                         </div>
                         <div className="text-[9px] font-mono text-slate-400 mt-1 leading-none">
-                          {bookedInfo.isBooked ? bookedInfo.bookerName : `₱${selectedCourt.pricePerHour}/hr`}
+                          {slotBooked ? bookerLabel : `₱${selectedCourt.pricePerHour}/hr`}
                         </div>
                       </div>
 
-                      {bookedInfo.isBooked ? (
+                      {slotBooked ? (
                         <span className="text-[9px] font-mono bg-zinc-200 text-zinc-500 px-1.5 py-0.5 rounded font-black uppercase">
                           Booked
                         </span>

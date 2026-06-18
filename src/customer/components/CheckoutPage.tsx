@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ShieldCheck, Mail, Phone, User, CreditCard, Lock, ArrowRight, AlertTriangle, Smartphone, Landmark, Check } from 'lucide-react';
 import { Court, Booking } from '../types';
+import { supabase, isSupabaseEnabled } from '../../lib/supabase';
 
 interface CheckoutPageProps {
   onNavigate: (screen: 'landing' | 'booking' | 'checkout' | 'confirmed' | 'bookings-list' | 'booking-detail') => void;
@@ -12,6 +13,7 @@ interface CheckoutPageProps {
   onOpenLogin: () => void;
   role: 'user' | 'admin' | null;
   onLogout: () => void;
+  currentUser?: { name: string; email: string; avatar?: string; } | null;
 }
 
 export default function CheckoutPage({
@@ -23,6 +25,7 @@ export default function CheckoutPage({
   onCompleteBooking,
   onOpenLogin,
   role,
+  currentUser,
   onLogout,
 }: CheckoutPageProps) {
   // User Credentials
@@ -154,44 +157,81 @@ export default function CheckoutPage({
     return true;
   };
 
-  const handlePaySubmit = (e: React.FormEvent) => {
+  const handlePaySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid()) return;
 
     setIsProcessing(true);
 
-    // Simulate charging gateway briefly
-    setTimeout(() => {
-      // Create random Booking ID starting SPC-
-      const finalBookingId = `SPC-${Math.floor(10000 + Math.random() * 90000)}`;
-      
-      const newBookingRecord: Booking = {
-        id: finalBookingId,
-        courtId: selectedCourt.id,
-        courtName: selectedCourt.name,
-        date: selectedDate,
-        startTime: selectedSlots[0],
-        endTime: (() => {
-          const sorted = [...selectedSlots].sort();
-          const last = sorted[sorted.length - 1];
-          const [h, m] = last.split(':');
-          const endH = parseInt(h) + 1;
-          return `${endH.toString().padStart(2, '0')}:${m}`;
-        })(),
-        slots: selectedSlots,
-        price: totalDue,
-        status: 'Upcoming',
-        fullName,
-        phoneNumber,
-        paymentMethod,
-        cardEnding: paymentMethod === 'Card' ? cardNumber.substring(cardNumber.length - 4) : undefined,
-        createdAt: new Date().toISOString(),
-      };
+    const finalBookingId = `SPC-${Math.floor(10000 + Math.random() * 90000)}`;
+    const sorted = [...selectedSlots].sort();
+    const last = sorted[sorted.length - 1];
+    const [lastH, lastM] = last.split(':');
+    const endTime = `${(parseInt(lastH) + 1).toString().padStart(2, '0')}:${lastM}`;
 
-      onCompleteBooking(newBookingRecord);
-      setIsProcessing(false);
-      onNavigate('confirmed');
-    }, 1800);
+    const newBookingRecord: Booking = {
+      id: finalBookingId,
+      courtId: selectedCourt.id,
+      courtName: selectedCourt.name,
+      date: selectedDate,
+      startTime: sorted[0],
+      endTime,
+      slots: selectedSlots,
+      price: totalDue,
+      status: 'Upcoming',
+      fullName,
+      phoneNumber,
+      paymentMethod,
+      cardEnding: paymentMethod === 'Card' ? cardNumber.slice(-4) : undefined,
+      createdAt: new Date().toISOString(),
+    };
+
+    if (isSupabaseEnabled && supabase) {
+      try {
+        // Insert the booking row
+        const { data: bookingRow, error: bookingErr } = await supabase
+          .from('bookings')
+          .insert({
+            booking_ref: finalBookingId,
+            booking_date: selectedDate,
+            start_time: sorted[0],
+            end_time: endTime,
+            court_id: null, // numeric court ID not available in customer data model
+            court_name: selectedCourt.name,
+            customer_name: fullName,
+            customer_phone: phoneNumber,
+            customer_email: email || null,
+            booking_status: 'confirmed',
+            payment_method: paymentMethod.toLowerCase().replace(' ', '_'),
+            payment_status: 'paid',
+            total_amount: totalDue,
+          })
+          .select('id')
+          .single();
+
+        if (bookingErr) console.error('[Supabase] bookings insert error:', bookingErr);
+        if (!bookingErr && bookingRow) {
+          // Insert one slot row per selected hour
+          const slotRows = selectedSlots.map((slotTime) => ({
+            booking_id: bookingRow.id,
+            court_id: null,
+            slot_date: selectedDate,
+            start_time: slotTime,
+            end_time: `${(parseInt(slotTime.split(':')[0]) + 1).toString().padStart(2, '0')}:${slotTime.split(':')[1]}`,
+          }));
+          await supabase.from('booking_slots').insert(slotRows);
+        }
+      } catch (err) {
+        console.error('[Supabase] booking insert failed:', err);
+      }
+    } else {
+      // Simulate gateway delay in demo mode
+      await new Promise((r) => setTimeout(r, 1800));
+    }
+
+    onCompleteBooking(newBookingRecord);
+    setIsProcessing(false);
+    onNavigate('confirmed');
   };
 
   return (
@@ -223,9 +263,14 @@ export default function CheckoutPage({
         <div className="flex items-center gap-3 font-mono text-[10px] text-slate-400">
           <span className="font-black text-blue-400 hidden md:block">SECURE PLATFORM</span>
           {role ? (
-            <button onClick={onLogout} className="text-slate-300 hover:text-white transition-colors py-1 px-3 bg-zinc-800/80 rounded text-xs">
-              Log out
-            </button>
+            <div className="flex items-center gap-2">
+              {currentUser?.avatar
+                ? <img src={currentUser.avatar} referrerPolicy="no-referrer" className="w-7 h-7 rounded-full border border-slate-600 object-cover" />
+                : <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-[11px] font-bold">{currentUser?.name?.[0]?.toUpperCase() ?? 'U'}</div>
+              }
+              <span className="text-slate-300 text-xs hidden md:block max-w-[120px] truncate">{currentUser?.name}</span>
+              <button onClick={onLogout} className="text-slate-400 hover:text-white py-1 px-2 bg-zinc-800/80 rounded text-xs">Sign out</button>
+            </div>
           ) : (
             <button onClick={onOpenLogin} className="text-slate-300 hover:text-white transition-colors py-1 px-3 border border-slate-600 hover:border-slate-400 rounded text-xs">
               Log in

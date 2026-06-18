@@ -9,9 +9,10 @@ interface ConfirmedPageProps {
   onOpenLogin: () => void;
   role: 'user' | 'admin' | null;
   onLogout: () => void;
+  currentUser?: { name: string; email: string; avatar?: string; } | null;
 }
 
-export default function ConfirmedPage({ onNavigate, booking, onOpenLogin, role, onLogout }: ConfirmedPageProps) {
+export default function ConfirmedPage({ onNavigate, booking, onOpenLogin, role, onLogout, currentUser }: ConfirmedPageProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -85,7 +86,14 @@ export default function ConfirmedPage({ onNavigate, booking, onOpenLogin, role, 
         </div>
         <div className="flex items-center gap-3 text-xs font-mono">
           {role ? (
-            <button onClick={onLogout} className="text-slate-300 hover:text-white transition-colors py-1 px-3 bg-zinc-800/80 rounded">Log out</button>
+            <div className="flex items-center gap-2">
+              {currentUser?.avatar
+                ? <img src={currentUser.avatar} referrerPolicy="no-referrer" className="w-7 h-7 rounded-full border border-slate-600 object-cover" />
+                : <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-[11px] font-bold">{currentUser?.name?.[0]?.toUpperCase() ?? 'U'}</div>
+              }
+              <span className="text-slate-300 text-xs hidden md:block max-w-[120px] truncate">{currentUser?.name}</span>
+              <button onClick={onLogout} className="text-slate-400 hover:text-white py-1 px-2 bg-zinc-800/80 rounded text-xs">Sign out</button>
+            </div>
           ) : (
             <button onClick={onOpenLogin} className="text-slate-300 hover:text-white transition-colors py-1 px-3 border border-slate-600 hover:border-slate-400 rounded">Log in</button>
           )}

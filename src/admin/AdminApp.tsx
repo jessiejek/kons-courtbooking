@@ -4,6 +4,8 @@ import { Calendar, User, Phone, X, Sparkles } from 'lucide-react';
 import LoginModal from '../LoginModal';
 import { Court, Booking, DayOfWeek, TimePriceRange, BookingStatus } from './types';
 import { defaultCourts, defaultBookings } from './data';
+import { useRealtimeBookings } from '../hooks/useRealtimeBookings';
+import { supabase, isSupabaseEnabled } from '../lib/supabase';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import DashboardView from './components/DashboardView';
@@ -18,6 +20,7 @@ interface Props {
   role: 'user' | 'admin' | null;
   onLogin: (role: 'user' | 'admin') => void;
   onLogout: () => void;
+  currentUser?: { name: string; email: string; avatar?: string; } | null;
 }
 
 function CourtEditRoute({
@@ -72,7 +75,7 @@ function LocationsView() {
   );
 }
 
-export default function AdminApp({ role, onLogin, onLogout }: Props) {
+export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [loginModalOpen, setLoginModalOpen] = useState(false);
@@ -146,18 +149,63 @@ export default function AdminApp({ role, onLogin, onLogout }: Props) {
 
   const activeDetailBooking = bookings.find(b => b.bookingId === selectedBookingId);
 
-  const handleUpdateBookingStatus = (bookingId: string, nextStatus: BookingStatus) => {
+  const handleUpdateBookingStatus = async (bookingId: string, nextStatus: BookingStatus) => {
     saveBookingsState(bookings.map(b => b.bookingId === bookingId ? { ...b, status: nextStatus } : b));
-    alert(`Reservation status updated to: ${nextStatus}`);
+
+    if (isSupabaseEnabled && supabase) {
+      await supabase
+        .from('bookings')
+        .update({ booking_status: nextStatus })
+        .eq('booking_ref', bookingId);
+    }
   };
 
-  const handleDeleteBooking = (bookingId: string) => {
+  const handleDeleteBooking = async (bookingId: string) => {
     if (confirm('Are you sure you want to permanently cancel and remove this booking from logs?')) {
       saveBookingsState(bookings.filter(b => b.bookingId !== bookingId));
       setSelectedBookingId(null);
-      alert('Booking deleted.');
+
+      if (isSupabaseEnabled && supabase) {
+        await supabase
+          .from('bookings')
+          .update({ booking_status: 'cancelled' })
+          .eq('booking_ref', bookingId);
+      }
     }
   };
+
+  // ── Realtime: new bookings arrive live ──────────────────
+  const [newBookingCount, setNewBookingCount] = useState(0);
+
+  useRealtimeBookings({
+    mode: 'all',
+    onInsert: (row) => {
+      // Map Supabase row → local Booking shape and prepend
+      const incoming: Booking = {
+        id: row.id,
+        bookingId: row.booking_ref,
+        date: row.booking_date,
+        time: row.start_time?.slice(0, 5) ?? '',
+        courtId: row.court_id,
+        courtName: row.court_name,
+        customerName: row.customer_name,
+        phone: row.customer_phone,
+        status: row.booking_status,
+        amount: Number(row.total_amount),
+      };
+      saveBookingsState([incoming, ...bookings]);
+      setNewBookingCount((n) => n + 1);
+    },
+    onUpdate: (row) => {
+      saveBookingsState(
+        bookings.map((b) =>
+          b.bookingId === row.booking_ref
+            ? { ...b, status: row.booking_status as BookingStatus }
+            : b
+        )
+      );
+    },
+  });
 
   const isCourtEditPage = pathname.startsWith('/admin/courts/');
   const backAction = isCourtEditPage
@@ -166,7 +214,13 @@ export default function AdminApp({ role, onLogin, onLogout }: Props) {
 
   return (
     <div id="court-and-co-root" className="min-h-screen bg-background text-on-background flex font-sans">
-      <Sidebar onNewBookingClick={() => setIsNewBookingOpen(true)} />
+      <Sidebar
+        onNewBookingClick={() => setIsNewBookingOpen(true)}
+        newBookingCount={newBookingCount}
+        onClearNewBookingCount={() => setNewBookingCount(0)}
+        currentUser={currentUser}
+        onLogout={onLogout}
+      />
       <div className="flex-1 ml-64 flex flex-col min-h-screen">
         <Header searchText={searchText} onSearchChange={setSearchText} backAction={backAction} />
 

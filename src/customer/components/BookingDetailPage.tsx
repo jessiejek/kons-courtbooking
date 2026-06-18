@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { ChevronLeft, Trash2, Download, ShieldAlert, Phone, MapPin, Printer, ExternalLink, HelpCircle, X, ShieldCheck } from 'lucide-react';
 import { Booking } from '../types';
 import { COURTS } from '../data';
+import { useRealtimeBookings } from '../../hooks/useRealtimeBookings';
 
 interface BookingDetailPageProps {
   onNavigate: (screen: 'landing' | 'booking' | 'checkout' | 'confirmed' | 'bookings-list' | 'booking-detail') => void;
@@ -11,6 +12,7 @@ interface BookingDetailPageProps {
   onOpenLogin: () => void;
   role: 'user' | 'admin' | null;
   onLogout: () => void;
+  currentUser?: { name: string; email: string; avatar?: string; } | null;
 }
 
 export default function BookingDetailPage({
@@ -19,6 +21,7 @@ export default function BookingDetailPage({
   onCancelBooking,
   onOpenLogin,
   role,
+  currentUser,
   onLogout,
 }: BookingDetailPageProps) {
   const { id } = useParams<{ id: string }>();
@@ -26,8 +29,31 @@ export default function BookingDetailPage({
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [phoneDialed, setPhoneDialed] = useState(false);
+  const [liveStatus, setLiveStatus] = useState<Booking['status'] | null>(null);
 
   const booking = bookings.find((b) => b.id === id);
+
+  // Subscribe to status changes for this specific booking
+  useRealtimeBookings({
+    mode: 'mine',
+    bookingRef: booking?.id,
+    onUpdate: (row) => {
+      // Map Supabase booking_status → customer app status
+      const map: Record<string, Booking['status']> = {
+        confirmed: 'Upcoming',
+        paid: 'Upcoming',
+        completed: 'Past',
+        cancelled: 'Cancelled',
+      };
+      const mapped = map[row.booking_status];
+      if (mapped) setLiveStatus(mapped);
+    },
+  });
+
+  // Use live status if available, otherwise fall back to prop
+  const effectiveBooking = booking && liveStatus
+    ? { ...booking, status: liveStatus }
+    : booking;
 
   if (!booking) {
     return (
@@ -88,7 +114,14 @@ export default function BookingDetailPage({
         
         <div className="flex items-center gap-3 text-xs font-mono">
           {role ? (
-            <button onClick={onLogout} className="text-slate-300 hover:text-white transition-colors py-1 px-3 bg-zinc-800/80 rounded">Log out</button>
+            <div className="flex items-center gap-2">
+              {currentUser?.avatar
+                ? <img src={currentUser.avatar} referrerPolicy="no-referrer" className="w-7 h-7 rounded-full border border-slate-600 object-cover" />
+                : <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-[11px] font-bold">{currentUser?.name?.[0]?.toUpperCase() ?? 'U'}</div>
+              }
+              <span className="text-slate-300 text-xs hidden md:block max-w-[120px] truncate">{currentUser?.name}</span>
+              <button onClick={onLogout} className="text-slate-400 hover:text-white py-1 px-2 bg-zinc-800/80 rounded text-xs">Sign out</button>
+            </div>
           ) : (
             <button onClick={onOpenLogin} className="text-slate-300 hover:text-white transition-colors py-1 px-3 border border-slate-600 hover:border-slate-400 rounded">Log in</button>
           )}
@@ -118,20 +151,26 @@ export default function BookingDetailPage({
                 <p className="text-[10px] font-mono text-slate-400 mt-1">Created on October 10, 2026 at 02:30 PM (PST)</p>
               </div>
 
-              <div>
-                {booking.status === 'Upcoming' && (
+              <div className="flex flex-col items-end gap-1.5">
+                {effectiveBooking?.status === 'Upcoming' && (
                   <span className="text-xs bg-blue-50 text-blue-800 border border-blue-200 font-mono font-black uppercase px-3 py-1.5 rounded-full block text-center min-w-[100px]">
                     ● Scheduled
                   </span>
                 )}
-                {booking.status === 'Past' && (
+                {effectiveBooking?.status === 'Past' && (
                   <span className="text-xs bg-slate-100 text-slate-500 border border-slate-200 font-mono font-bold uppercase px-3 py-1.5 rounded-full block text-center min-w-[100px]">
                     Past Session
                   </span>
                 )}
-                {booking.status === 'Cancelled' && (
+                {effectiveBooking?.status === 'Cancelled' && (
                   <span className="text-xs bg-[#BA1A1A]/10 text-[#BA1A1A] border border-[#BA1A1A]/20 font-mono font-bold uppercase px-3 py-1.5 rounded-full block text-center min-w-[100px]">
                     Cancelled
+                  </span>
+                )}
+                {liveStatus && (
+                  <span className="text-[9px] font-mono text-emerald-600 flex items-center gap-1 opacity-80">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                    Live
                   </span>
                 )}
               </div>
@@ -213,7 +252,7 @@ export default function BookingDetailPage({
                 <Download className="w-4 h-4" /> Download e-Receipt
               </button>
 
-              {booking.status === 'Upcoming' && (
+              {effectiveBooking?.status === 'Upcoming' && (
                 <button
                   onClick={() => setShowCancelModal(true)}
                   className="flex-1 py-3 bg-[#BA1A1A]/10 hover:bg-[#BA1A1A]/20 text-[#BA1A1A] font-mono text-xs font-bold uppercase rounded-xl flex items-center justify-center gap-1.5 transition-all outline-none border-none cursor-pointer"

@@ -10,11 +10,13 @@ import BookingsHistory from './components/BookingsHistory';
 import BookingDetailPage from './components/BookingDetailPage';
 import TechnologyModal from './components/TechnologyModal';
 import LoginModal from '../LoginModal';
+import { CurrentUser } from '../App';
 
 interface Props {
   role: 'user' | 'admin' | null;
   onLogin: (role: 'user' | 'admin') => void;
   onLogout: () => void;
+  currentUser: CurrentUser | null;
 }
 
 const SCREEN_TO_PATH: Record<Screen, string> = {
@@ -23,10 +25,10 @@ const SCREEN_TO_PATH: Record<Screen, string> = {
   'checkout':       '/checkout',
   'confirmed':      '/confirmed',
   'bookings-list':  '/bookings',
-  'booking-detail': '/bookings', // navigating to detail goes via handleViewDetail
+  'booking-detail': '/bookings',
 };
 
-export default function CustomerApp({ role, onLogin, onLogout }: Props) {
+export default function CustomerApp({ role, onLogin, onLogout, currentUser }: Props) {
   const navigate = useNavigate();
 
   const [selectedDate, setSelectedDate] = useState('2026-10-13');
@@ -79,6 +81,7 @@ export default function CustomerApp({ role, onLogin, onLogout }: Props) {
     onOpenLogin: () => setLoginModalOpen(true),
     role,
     onLogout,
+    currentUser,
   };
 
   return (

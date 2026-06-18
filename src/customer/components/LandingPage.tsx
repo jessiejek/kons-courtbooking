@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useRealtimeAnnouncements } from '../../hooks/useRealtimeAnnouncements';
 import {
   Calendar, MapPin, Phone, Clock, ArrowRight, ChevronRight,
   Star, Shield, Zap, Users, CheckCircle, Menu, X as XIcon
@@ -10,6 +11,7 @@ interface LandingPageProps {
   onOpenLogin: () => void;
   role: 'user' | 'admin' | null;
   onLogout: () => void;
+  currentUser?: { name: string; email: string; avatar?: string; } | null;
 }
 
 const COURTS = [
@@ -59,9 +61,12 @@ const TESTIMONIALS = [
   { name: 'Team Raqueta PH', role: 'Club League', quote: 'We host our entire league schedule here. The night lighting on Court 2 is stadium-quality. Zero complaints.', stars: 5 },
 ];
 
-export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, role, onLogout }: LandingPageProps) {
+export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, role, onLogout, currentUser }: LandingPageProps) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [dismissedAnnouncements, setDismissedAnnouncements] = useState<Set<string>>(new Set());
+  const liveAnnouncements = useRealtimeAnnouncements();
+  const visibleAnnouncements = liveAnnouncements.filter((a) => !dismissedAnnouncements.has(a.id));
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 40);
@@ -119,14 +124,16 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
           {/* CTA cluster */}
           <div className="flex items-center gap-3">
             {role ? (
-              <button
-                onClick={onLogout}
-                className={`hidden md:block text-xs font-semibold uppercase tracking-wider transition-colors hover:text-[#00694c] ${
-                  scrolled ? 'text-[#3d4943]' : 'text-white/70'
-                }`}
-              >
-                Log out
-              </button>
+              <div className="hidden md:flex items-center gap-2">
+                {currentUser?.avatar
+                  ? <img src={currentUser.avatar} referrerPolicy="no-referrer" className="w-7 h-7 rounded-full border border-white/30 object-cover" />
+                  : <div className="w-7 h-7 rounded-full bg-[#00694c] flex items-center justify-center text-white text-[11px] font-bold">{currentUser?.name?.[0]?.toUpperCase() ?? 'U'}</div>
+                }
+                <span className={`text-xs max-w-[100px] truncate ${scrolled ? 'text-[#3d4943]' : 'text-white/80'}`}>{currentUser?.name}</span>
+                <button onClick={onLogout} className={`text-xs font-semibold transition-colors hover:text-[#00694c] ${scrolled ? 'text-[#3d4943]' : 'text-white/70'}`}>
+                  Sign out
+                </button>
+              </div>
             ) : (
               <button
                 onClick={onOpenLogin}
@@ -171,10 +178,19 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
               My Bookings
             </button>
             {role ? (
-              <button onClick={() => { onLogout(); setMobileMenuOpen(false); }}
-                className="block text-sm font-semibold text-[#00694c] uppercase tracking-wider py-1 w-full text-left">
-                Log out
-              </button>
+              <div className="flex items-center justify-between py-1">
+                <div className="flex items-center gap-2">
+                  {currentUser?.avatar
+                    ? <img src={currentUser.avatar} referrerPolicy="no-referrer" className="w-6 h-6 rounded-full object-cover" />
+                    : <div className="w-6 h-6 rounded-full bg-[#00694c] flex items-center justify-center text-white text-[10px] font-bold">{currentUser?.name?.[0]?.toUpperCase() ?? 'U'}</div>
+                  }
+                  <span className="text-sm font-semibold text-[#1a1c1b] truncate max-w-[140px]">{currentUser?.name}</span>
+                </div>
+                <button onClick={() => { onLogout(); setMobileMenuOpen(false); }}
+                  className="text-sm font-semibold text-[#00694c] uppercase tracking-wider">
+                  Sign out
+                </button>
+              </div>
             ) : (
               <button onClick={() => { onOpenLogin(); setMobileMenuOpen(false); }}
                 className="block text-sm font-semibold text-[#00694c] uppercase tracking-wider py-1 w-full text-left">
@@ -184,6 +200,43 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
           </div>
         )}
       </header>
+
+      {/* ── LIVE ANNOUNCEMENTS BANNER ──────────────────────────── */}
+      {visibleAnnouncements.length > 0 && (
+        <div className="relative z-40 mt-16 space-y-0">
+          {visibleAnnouncements.map((a) => (
+            <div
+              key={a.id}
+              className={`flex items-center justify-between gap-3 px-4 py-2.5 text-xs ${
+                a.is_pinned
+                  ? 'bg-[#00694c] text-white'
+                  : 'bg-amber-50 text-amber-900 border-b border-amber-200'
+              }`}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                {a.is_pinned && (
+                  <span className="shrink-0 font-bold uppercase text-[10px] tracking-widest opacity-70">
+                    📌 Pinned
+                  </span>
+                )}
+                <span className="font-semibold truncate">{a.title}</span>
+                {a.body && (
+                  <span className={`hidden sm:inline truncate ${a.is_pinned ? 'opacity-80' : 'text-amber-700'}`}>
+                    — {a.body}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => setDismissedAnnouncements((s) => new Set([...s, a.id]))}
+                className="shrink-0 opacity-60 hover:opacity-100 transition-opacity p-0.5"
+                aria-label="Dismiss"
+              >
+                <XIcon className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── HERO ───────────────────────────────────────────────── */}
       <section className="relative min-h-screen flex flex-col overflow-hidden">

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Calendar, ClipboardList, PlusCircle, Search, ChevronRight, Bell, Tag } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, ClipboardList, PlusCircle, Search, ChevronRight, Bell, Tag, RefreshCw } from 'lucide-react';
 import { Booking, Court } from '../types';
 import { COURTS } from '../data';
+import { supabase, isSupabaseEnabled } from '../../lib/supabase';
 
 interface BookingsHistoryProps {
   onNavigate: (screen: 'landing' | 'booking' | 'checkout' | 'confirmed' | 'bookings-list' | 'booking-detail') => void;
@@ -10,18 +11,64 @@ interface BookingsHistoryProps {
   onOpenLogin: () => void;
   role: 'user' | 'admin' | null;
   onLogout: () => void;
+  currentUser?: { name: string; email: string; avatar?: string; } | null;
 }
 
 export default function BookingsHistory({
   onNavigate,
-  bookings,
+  bookings: localBookings,
   onViewDetail,
   onOpenLogin,
   role,
+  currentUser,
   onLogout,
 }: BookingsHistoryProps) {
   const [activeFilterTab, setActiveFilterTab] = useState<'Upcoming' | 'Past' | 'All'>('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [supabaseBookings, setSupabaseBookings] = useState<Booking[] | null>(null);
+  const [isFetching, setIsFetching] = useState(false);
+
+  useEffect(() => {
+    if (!isSupabaseEnabled || !supabase) return;
+
+    const fetchBookings = async () => {
+      setIsFetching(true);
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('id, booking_ref, booking_date, start_time, end_time, court_name, customer_name, customer_phone, booking_status, payment_method, total_amount, created_at')
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        const statusMap: Record<string, Booking['status']> = {
+          confirmed: 'Upcoming', paid: 'Upcoming',
+          completed: 'Past', cancelled: 'Cancelled', pending: 'Upcoming',
+        };
+        setSupabaseBookings(
+          data.map((row) => ({
+            id: row.booking_ref,
+            courtId: 'court-1',
+            courtName: row.court_name,
+            date: row.booking_date,
+            startTime: row.start_time?.slice(0, 5) ?? '09:00',
+            endTime: row.end_time?.slice(0, 5) ?? '11:00',
+            slots: [],
+            price: Number(row.total_amount),
+            status: statusMap[row.booking_status] ?? 'Upcoming',
+            fullName: row.customer_name,
+            phoneNumber: row.customer_phone ?? '',
+            paymentMethod: (row.payment_method === 'card' ? 'Card' : row.payment_method === 'gcash' ? 'GCash' : 'Online Banking') as Booking['paymentMethod'],
+            createdAt: row.created_at,
+          }))
+        );
+      }
+      setIsFetching(false);
+    };
+
+    fetchBookings();
+  }, []);
+
+  // Use Supabase data when available, fall through to localStorage prop
+  const bookings = supabaseBookings ?? localBookings;
 
   // Get matching court image thumbnail helper
   const getCourtImage = (courtId: string) => {
@@ -79,9 +126,14 @@ export default function BookingsHistory({
         
         <div className="flex items-center gap-3">
           {role ? (
-            <button onClick={onLogout} className="text-slate-300 hover:text-white font-mono text-xs uppercase tracking-wider py-1 px-3 bg-zinc-800/80 rounded transition-colors">
-              Log out
-            </button>
+            <div className="flex items-center gap-2">
+              {currentUser?.avatar
+                ? <img src={currentUser.avatar} referrerPolicy="no-referrer" className="w-7 h-7 rounded-full border border-slate-600 object-cover" />
+                : <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-[11px] font-bold">{currentUser?.name?.[0]?.toUpperCase() ?? 'U'}</div>
+              }
+              <span className="text-slate-300 text-xs hidden md:block max-w-[120px] truncate">{currentUser?.name}</span>
+              <button onClick={onLogout} className="text-slate-400 hover:text-white py-1 px-2 bg-zinc-800/80 rounded text-xs">Sign out</button>
+            </div>
           ) : (
             <button onClick={onOpenLogin} className="text-slate-300 hover:text-white font-mono text-xs uppercase tracking-wider py-1 px-3 border border-slate-600 hover:border-slate-400 rounded transition-colors">
               Log in
@@ -103,8 +155,9 @@ export default function BookingsHistory({
             <span className="text-[10px] bg-blue-500/10 text-blue-300 border border-blue-500/20 font-mono font-bold px-2.5 py-1 rounded-full uppercase">
               Authenticated Profile
             </span>
-            <h2 className="text-3xl font-sans font-black tracking-tight text-white mt-2 leading-tight">
+            <h2 className="text-3xl font-sans font-black tracking-tight text-white mt-2 leading-tight flex items-center gap-3">
               My reservations
+              {isFetching && <RefreshCw className="w-5 h-5 text-blue-400 animate-spin" />}
             </h2>
             <p className="text-xs text-slate-400 mt-1 leading-relaxed">
               Welcome back, Juan Dela Cruz. Easily track schedules, cancel bookings, or download transaction receipts.

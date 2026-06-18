@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, X } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, X, AlertCircle } from 'lucide-react';
+import { supabase, isSupabaseEnabled } from './lib/supabase';
 
 interface Props {
   isOpen: boolean;
@@ -8,28 +9,124 @@ interface Props {
   onLogin: (role: 'user' | 'admin') => void;
 }
 
+type AuthMode = 'signin' | 'signup';
+
 export default function LoginModal({ isOpen, onClose, onLogin }: Props) {
   const navigate = useNavigate();
+  const [authMode, setAuthMode] = useState<AuthMode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<'google' | 'facebook' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleSocialLogin = (provider: 'google' | 'facebook') => {
+  const reset = () => {
+    setError(null);
+    setSuccessMsg(null);
+  };
+
+  // ── Social OAuth ────────────────────────────────────────────
+  const handleSocialLogin = async (provider: 'google' | 'facebook') => {
+    reset();
+    if (isSupabaseEnabled && supabase) {
+      setSocialLoading(provider);
+      const { error: oauthErr } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: window.location.origin },
+      });
+      setSocialLoading(null);
+      if (oauthErr) { setError(oauthErr.message); return; }
+      // Redirect handled by Supabase — modal stays open briefly
+      return;
+    }
+    // Demo fallback
     setSocialLoading(provider);
     setTimeout(() => {
       setSocialLoading(null);
       onLogin('user');
       onClose();
-    }, 1200);
+    }, 1000);
   };
 
+  // ── Email / password sign-in ────────────────────────────────
+  const handleEmailSignIn = async () => {
+    reset();
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter both email and password.');
+      return;
+    }
+
+    if (isSupabaseEnabled && supabase) {
+      setIsLoading(true);
+      const { data, error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+      setIsLoading(false);
+
+      if (signInErr) { setError(signInErr.message); return; }
+
+      // Determine role from user metadata or profiles table
+      const userMeta = data.user?.user_metadata;
+      const role: 'user' | 'admin' = userMeta?.role === 'admin' ? 'admin' : 'user';
+      onLogin(role);
+      onClose();
+      if (role === 'admin') navigate('/admin');
+      return;
+    }
+
+    // Demo fallback — infer admin by email
+    const role: 'user' | 'admin' = email.toLowerCase().includes('admin') ? 'admin' : 'user';
+    onLogin(role);
+    onClose();
+    if (role === 'admin') navigate('/admin');
+  };
+
+  // ── Email / password sign-up ────────────────────────────────
+  const handleEmailSignUp = async () => {
+    reset();
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter both email and password.');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+
+    if (isSupabaseEnabled && supabase) {
+      setIsLoading(true);
+      const { error: signUpErr } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { role: 'user' } },
+      });
+      setIsLoading(false);
+
+      if (signUpErr) { setError(signUpErr.message); return; }
+
+      setSuccessMsg('Account created! Check your email to confirm, then sign in.');
+      setAuthMode('signin');
+      return;
+    }
+
+    // Demo fallback
+    onLogin('user');
+    onClose();
+  };
+
+  // ── Demo one-click role cards ───────────────────────────────
   const handleRoleLogin = (role: 'user' | 'admin') => {
     onLogin(role);
     onClose();
     if (role === 'admin') navigate('/admin');
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (authMode === 'signin') handleEmailSignIn();
+    else handleEmailSignUp();
   };
 
   return (
@@ -39,7 +136,7 @@ export default function LoginModal({ isOpen, onClose, onLogin }: Props) {
     >
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
 
-        {/* Modal header */}
+        {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-2">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow">
@@ -49,23 +146,52 @@ export default function LoginModal({ isOpen, onClose, onLogin }: Props) {
             </div>
             <div>
               <p className="text-sm font-extrabold text-on-surface leading-tight">Court &amp; Co.</p>
-              <p className="text-[11px] text-on-surface-variant font-medium leading-tight">Sign in to your account</p>
+              <p className="text-[11px] text-on-surface-variant font-medium leading-tight">
+                {authMode === 'signin' ? 'Sign in to your account' : 'Create a new account'}
+              </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-full text-on-surface-variant hover:bg-surface-container transition-colors"
-          >
+          <button onClick={onClose} className="p-1.5 rounded-full text-on-surface-variant hover:bg-surface-container transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <div className="px-6 py-4 space-y-3">
 
-          {/* Social login */}
+          {/* Sign-in / Sign-up toggle */}
+          <div className="flex bg-surface-container-low rounded-xl p-1 gap-1">
+            {(['signin', 'signup'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => { setAuthMode(mode); reset(); }}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+                  authMode === mode ? 'bg-white text-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                {mode === 'signin' ? 'Sign In' : 'Sign Up'}
+              </button>
+            ))}
+          </div>
+
+          {/* Error / success banners */}
+          {error && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl p-3">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+          {successMsg && (
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-xl p-3">
+              {successMsg}
+            </div>
+          )}
+
+          {/* Social buttons */}
           <button
+            type="button"
             onClick={() => handleSocialLogin('google')}
-            disabled={socialLoading !== null}
+            disabled={isLoading || socialLoading !== null}
             className="w-full flex items-center justify-center gap-3 border border-outline-variant rounded-xl py-2.5 px-4 text-sm font-semibold text-on-surface hover:bg-surface-container-low transition-colors disabled:opacity-60"
           >
             {socialLoading === 'google' ? (
@@ -82,8 +208,9 @@ export default function LoginModal({ isOpen, onClose, onLogin }: Props) {
           </button>
 
           <button
+            type="button"
             onClick={() => handleSocialLogin('facebook')}
-            disabled={socialLoading !== null}
+            disabled={isLoading || socialLoading !== null}
             className="w-full flex items-center justify-center gap-3 border border-outline-variant rounded-xl py-2.5 px-4 text-sm font-semibold text-on-surface hover:bg-surface-container-low transition-colors disabled:opacity-60"
           >
             {socialLoading === 'facebook' ? (
@@ -99,52 +226,81 @@ export default function LoginModal({ isOpen, onClose, onLogin }: Props) {
           {/* Divider */}
           <div className="flex items-center gap-3">
             <div className="flex-1 h-px bg-outline-variant" />
-            <span className="text-xs text-outline font-semibold uppercase tracking-wider">or</span>
+            <span className="text-xs text-outline font-semibold uppercase tracking-wider">or email</span>
             <div className="flex-1 h-px bg-outline-variant" />
           </div>
 
-          {/* Email / password */}
-          <div className="relative">
-            <Mail className="w-4 h-4 text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="email"
-              placeholder="Email address"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-surface-container-low border border-outline-variant rounded-xl pl-10 pr-4 py-2.5 text-sm font-medium focus:outline-none focus:border-primary transition-colors"
-            />
-          </div>
-          <div className="relative">
-            <Lock className="w-4 h-4 text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-surface-container-low border border-outline-variant rounded-xl pl-10 pr-10 py-2.5 text-sm font-medium focus:outline-none focus:border-primary transition-colors"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((p) => !p)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface transition-colors"
-            >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-          <div className="text-right -mt-1">
-            <button className="text-xs text-primary font-semibold hover:underline">Forgot password?</button>
-          </div>
+          {/* Email / password form */}
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="relative">
+              <Mail className="w-4 h-4 text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="email"
+                placeholder="Email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full bg-surface-container-low border border-outline-variant rounded-xl pl-10 pr-4 py-2.5 text-sm font-medium focus:outline-none focus:border-primary transition-colors"
+              />
+            </div>
+            <div className="relative">
+              <Lock className="w-4 h-4 text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder={authMode === 'signup' ? 'Password (min 6 chars)' : 'Password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full bg-surface-container-low border border-outline-variant rounded-xl pl-10 pr-10 py-2.5 text-sm font-medium focus:outline-none focus:border-primary transition-colors"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((p) => !p)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface transition-colors"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
 
-          {/* Role divider */}
+            {authMode === 'signin' && (
+              <div className="text-right -mt-1">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!email.trim()) { setError('Enter your email first.'); return; }
+                    if (isSupabaseEnabled && supabase) {
+                      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email);
+                      if (resetErr) setError(resetErr.message);
+                      else setSuccessMsg('Password reset email sent — check your inbox.');
+                    }
+                  }}
+                  className="text-xs text-primary font-semibold hover:underline"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-2.5 bg-primary text-on-primary rounded-xl text-sm font-bold transition-all hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {isLoading && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+              {authMode === 'signin' ? 'Sign In' : 'Create Account'}
+            </button>
+          </form>
+
+          {/* Demo quick-access — always visible */}
           <div className="flex items-center gap-3">
             <div className="flex-1 h-px bg-outline-variant" />
-            <span className="text-xs text-outline font-semibold uppercase tracking-wider">sign in as</span>
+            <span className="text-xs text-outline font-semibold uppercase tracking-wider">demo access</span>
             <div className="flex-1 h-px bg-outline-variant" />
           </div>
 
-          {/* Role cards */}
           <div className="grid grid-cols-2 gap-3 pb-2">
             <button
+              type="button"
               onClick={() => handleRoleLogin('user')}
               className="flex flex-col items-center gap-2 border-2 border-outline-variant hover:border-primary rounded-xl py-4 px-3 text-center transition-all group"
             >
@@ -160,6 +316,7 @@ export default function LoginModal({ isOpen, onClose, onLogin }: Props) {
             </button>
 
             <button
+              type="button"
               onClick={() => handleRoleLogin('admin')}
               className="flex flex-col items-center gap-2 border-2 border-outline-variant hover:border-primary rounded-xl py-4 px-3 text-center transition-all group"
             >
@@ -174,8 +331,8 @@ export default function LoginModal({ isOpen, onClose, onLogin }: Props) {
               </div>
             </button>
           </div>
-        </div>
 
+        </div>
       </div>
     </div>
   );

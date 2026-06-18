@@ -12,22 +12,45 @@ create extension if not exists "pg_trgm"; -- for fast text search on names
 
 
 -- ────────────────────────────────────────────────────────────
--- 1. ENUMS
+-- 1. ENUMS  (safe — skips if already exists)
 -- ────────────────────────────────────────────────────────────
-create type user_role          as enum ('player', 'staff', 'admin');
-create type court_surface      as enum ('indoor', 'outdoor');
-create type court_status       as enum ('active', 'maintenance', 'inactive');
-create type day_of_week        as enum ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
-create type booking_status     as enum ('pending','confirmed','paid','completed','cancelled');
-create type payment_method     as enum ('Card','GCash','Online Banking');
-create type payment_status     as enum ('pending','paid','refunded','failed');
-create type location_type      as enum ('main','branch');
+do $$ begin
+  create type user_role as enum ('player', 'staff', 'admin');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type court_surface as enum ('indoor', 'outdoor');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type court_status as enum ('active', 'maintenance', 'inactive');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type day_of_week as enum ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type booking_status as enum ('pending','confirmed','paid','completed','cancelled');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type payment_method as enum ('Card','GCash','Online Banking');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type payment_status as enum ('pending','paid','refunded','failed');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type location_type as enum ('main','branch');
+exception when duplicate_object then null; end $$;
 
 
 -- ────────────────────────────────────────────────────────────
 -- 2. PROFILES  (extends auth.users)
 -- ────────────────────────────────────────────────────────────
-create table public.profiles (
+create table if not exists public.profiles (
   id            uuid         primary key references auth.users(id) on delete cascade,
   full_name     text,
   phone         text,
@@ -63,7 +86,7 @@ create trigger on_auth_user_created
 -- ────────────────────────────────────────────────────────────
 -- 3. LOCATIONS  (facility branches)
 -- ────────────────────────────────────────────────────────────
-create table public.locations (
+create table if not exists public.locations (
   id              serial       primary key,
   name            text         not null,
   address         text         not null,
@@ -87,7 +110,7 @@ comment on table public.locations is
 -- ────────────────────────────────────────────────────────────
 -- 4. COURTS
 -- ────────────────────────────────────────────────────────────
-create table public.courts (
+create table if not exists public.courts (
   id              serial         primary key,
   location_id     int            references public.locations(id) on delete set null,
   -- used as the string key in the customer app (court-1, court-2 …)
@@ -110,14 +133,14 @@ create table public.courts (
 comment on table public.courts is
   'A court belongs to a location. Slug matches the id used in the customer app.';
 
-create index idx_courts_location  on public.courts(location_id);
-create index idx_courts_status    on public.courts(status);
+create index if not exists idx_courts_location  on public.courts(location_id);
+create index if not exists idx_courts_status    on public.courts(status);
 
 
 -- ────────────────────────────────────────────────────────────
 -- 5. COURT PRICING  (per day-of-week time bands)
 -- ────────────────────────────────────────────────────────────
-create table public.court_pricing (
+create table if not exists public.court_pricing (
   id          uuid           primary key default gen_random_uuid(),
   court_id    int            not null references public.courts(id) on delete cascade,
   day         day_of_week    not null,
@@ -135,20 +158,21 @@ comment on table public.court_pricing is
   'Time-banded pricing per day of week. Replaces the pricing JSONB in the admin app.
    To find the rate for a given slot: match court_id + day + start_time <= slot < end_time.';
 
-create index idx_court_pricing_court on public.court_pricing(court_id, day);
+create index if not exists idx_court_pricing_court on public.court_pricing(court_id, day);
 
 
 -- ────────────────────────────────────────────────────────────
 -- 6. BOOKINGS
 -- ────────────────────────────────────────────────────────────
-create table public.bookings (
+create table if not exists public.bookings (
   id               uuid            primary key default gen_random_uuid(),
   -- human-readable reference shown to customers (SPC-88219) and staff (BK-1001)
   booking_ref      text            unique not null,
 
   -- nullable: guest bookings have no user_id
   user_id          uuid            references auth.users(id) on delete set null,
-  court_id         int             not null references public.courts(id),
+  -- nullable: customer app resolves court by slug; court_id populated by trigger or admin
+  court_id         int             references public.courts(id) on delete set null,
   -- denormalized for display without joins
   court_name       text            not null,
 
@@ -185,24 +209,24 @@ comment on table public.bookings is
   'Master bookings table used by both the customer app and the admin terminal.
    booking_ref format: SPC-XXXXX for online, BK-XXXX for walk-in/admin-created.';
 
-create index idx_bookings_user        on public.bookings(user_id);
-create index idx_bookings_court_date  on public.bookings(court_id, booking_date);
-create index idx_bookings_status      on public.bookings(booking_status);
-create index idx_bookings_ref         on public.bookings(booking_ref);
+create index if not exists idx_bookings_user        on public.bookings(user_id);
+create index if not exists idx_bookings_court_date  on public.bookings(court_id, booking_date);
+create index if not exists idx_bookings_status      on public.bookings(booking_status);
+create index if not exists idx_bookings_ref         on public.bookings(booking_ref);
 
 
 -- ────────────────────────────────────────────────────────────
 -- 7. BOOKING SLOTS  (one row per 1-hour block)
 -- Enforces no double-booking at the database level.
 -- ────────────────────────────────────────────────────────────
-create table public.booking_slots (
+create table if not exists public.booking_slots (
   id          uuid  primary key default gen_random_uuid(),
   booking_id  uuid  not null references public.bookings(id) on delete cascade,
-  court_id    int   not null references public.courts(id),
+  court_id    int   references public.courts(id) on delete set null,
   slot_date   date  not null,
   slot_time   time  not null,  -- e.g. 09:00 means the 09:00–10:00 hour
 
-  -- THE key constraint: one booking per slot per court per day
+  -- prevent double-booking per court per day (only enforced when court_id is known)
   unique (court_id, slot_date, slot_time)
 );
 
@@ -210,14 +234,14 @@ comment on table public.booking_slots is
   'One row per 1-hour block. The unique constraint prevents double-booking
    at DB level — no need to check in application code.';
 
-create index idx_slots_court_date on public.booking_slots(court_id, slot_date);
-create index idx_slots_booking    on public.booking_slots(booking_id);
+create index if not exists idx_slots_court_date on public.booking_slots(court_id, slot_date);
+create index if not exists idx_slots_booking    on public.booking_slots(booking_id);
 
 
 -- ────────────────────────────────────────────────────────────
 -- 8. ANNOUNCEMENTS  (admin broadcast notices)
 -- ────────────────────────────────────────────────────────────
-create table public.announcements (
+create table if not exists public.announcements (
   id          uuid         primary key default gen_random_uuid(),
   title       text         not null,
   body        text         not null,
@@ -233,7 +257,7 @@ create table public.announcements (
 comment on table public.announcements is
   'Admin-managed broadcast messages shown on the customer landing page.';
 
-create index idx_announcements_active on public.announcements(is_active, publish_at);
+create index if not exists idx_announcements_active on public.announcements(is_active, publish_at);
 
 
 -- ────────────────────────────────────────────────────────────
@@ -653,6 +677,16 @@ values (
 --   Target roles: authenticated
 --   Expression  : (public.current_user_role() = 'admin')
 -- ────────────────────────────────────────────────────────────
+
+
+-- ────────────────────────────────────────────────────────────
+-- 19. REALTIME PUBLICATION
+--     Enable postgres_changes events for the three tables
+--     that have live subscribers in the front-end.
+-- ────────────────────────────────────────────────────────────
+alter publication supabase_realtime add table public.booking_slots;
+alter publication supabase_realtime add table public.bookings;
+alter publication supabase_realtime add table public.announcements;
 
 
 -- ────────────────────────────────────────────────────────────

@@ -37,6 +37,11 @@ export default function DashboardView({
     .filter(b => b.status === 'paid' || b.status === 'completed' || b.status === 'confirmed')
     .reduce((sum, b) => sum + b.amount, 0);
 
+  // Occupancy: active bookings / (courts * 16 operating hours)
+  const activeBookingsCount = bookings.filter(b => b.status === 'confirmed' || b.status === 'paid').length;
+  const totalCapacity = Math.max(1, activeCourtsCount * 16);
+  const occupancyRate = Math.min(100, Math.round((activeBookingsCount / totalCapacity) * 100));
+
   // Format currency
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('en-PH', {
@@ -46,24 +51,31 @@ export default function DashboardView({
     }).format(val);
   };
 
-  // Mock revenue chart data
-  const revenueData = [
-    { day: 'Mon', value: 12000, label: '₱12k' },
-    { day: 'Tue', value: 18000, label: '₱18k' },
-    { day: 'Wed', value: 14000, label: '₱14k' },
-    { day: 'Thu', value: 22000, label: '₱22k' },
-    { day: 'Fri', value: 28500, label: '₱28.5k', isPeak: true },
-    { day: 'Sat', value: 20000, label: '₱20k' },
-    { day: 'Sun', value: 16000, label: '₱16k' }
-  ];
+  // Build revenue chart from real booking data (last 7 days)
+  const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const today = new Date();
+  const revenueByDay: Record<string, number> = {};
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    revenueByDay[d.toISOString().slice(0, 10)] = 0;
+  }
+  bookings
+    .filter(b => b.status === 'paid' || b.status === 'completed' || b.status === 'confirmed')
+    .forEach(b => {
+      if (revenueByDay[b.date] !== undefined) revenueByDay[b.date] += b.amount;
+    });
+  const revenueData = Object.entries(revenueByDay).map(([date, value]) => {
+    const d = new Date(date);
+    return { day: dayLabels[d.getDay()], value, label: value >= 1000 ? `₱${(value / 1000).toFixed(1)}k` : `₱${value}` };
+  });
+  const peakValue = Math.max(...revenueData.map(r => r.value), 1);
+  const revenueDataWithPeak = revenueData.map(r => ({ ...r, isPeak: r.value === peakValue && peakValue > 0 }));
 
-  // Filter today's bookings for the table matching Screenshot 4
-  const dashboardBookings = bookings.filter(b => 
-    b.bookingId === 'BK-1011' || 
-    b.bookingId === 'BK-1012' || 
-    b.bookingId === 'BK-1013' || 
-    b.bookingId === 'BK-1014'
-  );
+  // Show the 4 most recent bookings on the dashboard
+  const dashboardBookings = [...bookings]
+    .sort((a, b) => (b.bookingId > a.bookingId ? 1 : -1))
+    .slice(0, 4);
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -141,7 +153,7 @@ export default function DashboardView({
             Revenue This Month
           </p>
           <h3 className="text-4xl font-extrabold text-on-surface mt-1.5 font-headline">
-            {formatCurrency(totalRevenue || 42500)}
+            {formatCurrency(totalRevenue)}
           </h3>
         </div>
 
@@ -159,7 +171,7 @@ export default function DashboardView({
             Occupancy Rate
           </p>
           <h3 className="text-4xl font-extrabold text-on-surface mt-1.5 font-headline">
-            78%
+            {occupancyRate}%
           </h3>
         </div>
 
@@ -199,8 +211,8 @@ export default function DashboardView({
           <div className="h-64 w-full relative pt-4">
             {/* Native Clean Custom Column chart matching CSS specs */}
             <div className="absolute inset-0 flex items-end justify-between px-2 gap-4">
-              {revenueData.map((item, index) => {
-                const heightPercent = `${Math.round((item.value / 30000) * 100)}%`;
+              {revenueDataWithPeak.map((item, index) => {
+                const heightPercent = `${Math.max(4, Math.round((item.value / Math.max(peakValue, 1)) * 100))}%`;
                 return (
                   <div 
                     key={index}
@@ -229,7 +241,7 @@ export default function DashboardView({
           </div>
           
           <div className="flex justify-between mt-4 text-[10px] text-outline font-bold tracking-wider uppercase border-t border-outline-variant/30 pt-3">
-            {revenueData.map((d, index) => (
+            {revenueDataWithPeak.map((d, index) => (
               <span key={index}>{d.day}</span>
             ))}
           </div>
