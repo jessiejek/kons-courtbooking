@@ -20,9 +20,13 @@ interface RoutesProps {
 function AppRoutes({ role, onLogin, onLogout, currentUser }: RoutesProps) {
   const { pathname } = useLocation();
 
-  // Auto-redirect admin users to /admin when they land on customer pages
+  // Redirect admin → /admin
   if (role === 'admin' && !pathname.startsWith('/admin')) {
     return <Navigate to="/admin" replace />;
+  }
+  // Redirect non-admin away from /admin after logout
+  if (role !== 'admin' && pathname.startsWith('/admin')) {
+    return <Navigate to="/" replace />;
   }
 
   return (
