@@ -6,7 +6,7 @@ import { useRealtimeSlots } from '../../hooks/useRealtimeSlots';
 import { isSupabaseEnabled, supabase } from '../../lib/supabase';
 
 interface PricingRange { start: string; end: string; rate: number; courtId: number | null; }
-interface CourtMeta { dbId: number; useGlobal: boolean; defaultPrice: number; name: string; surfaceType: string; }
+interface CourtMeta { dbId: number; useGlobal: boolean; defaultPrice: number; name: string; surfaceType: string; status: string; }
 
 // Returns the applicable rate for a given time slot from loaded pricing ranges
 const getRateForSlot = (
@@ -144,14 +144,14 @@ export default function BookingSelector({
   useEffect(() => {
     if (!isSupabaseEnabled || !supabase) return;
     const load = async () => {
-      const { data: courts } = await supabase.from('courts').select('id, slug, name, surface_type, default_price, use_global_pricing').eq('status', 'active');
+      const { data: courts } = await supabase.from('courts').select('id, slug, name, surface_type, default_price, use_global_pricing, status').neq('status', 'inactive');
       const { data: pricing } = await supabase.from('court_pricing').select('court_id, start_time, end_time, rate');
 
       if (courts) {
         const meta: Record<string, CourtMeta> = {};
         const slugs: string[] = [];
         courts.forEach((c: any) => {
-          meta[c.slug] = { dbId: c.id, useGlobal: c.use_global_pricing ?? true, defaultPrice: Number(c.default_price), name: c.name, surfaceType: c.surface_type ?? '' };
+          meta[c.slug] = { dbId: c.id, useGlobal: c.use_global_pricing ?? true, defaultPrice: Number(c.default_price), name: c.name, surfaceType: c.surface_type ?? '', status: c.status ?? 'active' };
           slugs.push(c.slug);
         });
         setCourtMeta(meta);
@@ -178,7 +178,7 @@ export default function BookingSelector({
     load();
   }, []);
 
-  // Only show active courts — filter static list by slugs from Supabase
+  // Show all non-inactive courts (active + maintenance)
   const COURTS = activeSlugs.length > 0
     ? STATIC_COURTS.filter(c => activeSlugs.includes(c.id))
     : STATIC_COURTS;
@@ -415,32 +415,41 @@ export default function BookingSelector({
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                 {COURTS.map((court) => {
                   const isMarkedSelected = selectedCourtId === court.id;
+                  const isMaintenance = courtMeta[court.id]?.status === 'maintenance';
                   return (
                     <button
                       key={court.id}
+                      disabled={isMaintenance}
                       onClick={() => {
+                        if (isMaintenance) return;
                         setSelectedCourtId(court.id);
-                        clearSelection(); // reset selection to avoid confusion
+                        clearSelection();
                       }}
-                      className={`flex flex-col text-left p-3 rounded-xl border transition-all cursor-pointer ${
-                        isMarkedSelected 
-                          ? 'bg-blue-50/70 border-blue-500 shadow-sm transform scale-[1.01]' 
-                          : 'bg-slate-100 hover:bg-slate-250 border-slate-200'
+                      className={`flex flex-col text-left p-3 rounded-xl border transition-all ${
+                        isMaintenance
+                          ? 'bg-amber-50 border-amber-200 cursor-not-allowed opacity-70'
+                          : isMarkedSelected
+                            ? 'bg-blue-50/70 border-blue-500 shadow-sm transform scale-[1.01] cursor-pointer'
+                            : 'bg-slate-100 hover:bg-slate-250 border-slate-200 cursor-pointer'
                       }`}
                     >
                       <div className="flex items-center justify-between w-full">
                         <span className="text-[10px] font-mono font-bold uppercase text-slate-500">
                           {courtMeta[court.id]?.surfaceType || court.type}
                         </span>
-                        {isMarkedSelected && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-                        )}
+                        {isMaintenance
+                          ? <span className="text-[9px] font-mono font-bold uppercase text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">Maintenance</span>
+                          : isMarkedSelected && <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                        }
                       </div>
-                      <h4 className="font-sans font-bold text-xs text-slate-900 mt-1 leading-tight shrink-0">
+                      <h4 className={`font-sans font-bold text-xs mt-1 leading-tight shrink-0 ${isMaintenance ? 'text-slate-400' : 'text-slate-900'}`}>
                         {courtMeta[court.id]?.name || court.name}
                       </h4>
                       <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-200/60 w-full text-[10px] font-mono">
-                        <span className="font-black text-blue-600">₱{courtMeta[court.id]?.defaultPrice ?? court.pricePerHour}/hr</span>
+                        {isMaintenance
+                          ? <span className="text-amber-500 font-bold">Unavailable</span>
+                          : <span className="font-black text-blue-600">₱{courtMeta[court.id]?.defaultPrice ?? court.pricePerHour}/hr</span>
+                        }
                         <span className="text-slate-400">★ {court.rating}</span>
                       </div>
                     </button>
