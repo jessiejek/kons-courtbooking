@@ -42,7 +42,7 @@ export default function Header({ searchText, onSearchChange, backAction }: Heade
       {/* Right side: Notifications, separator, user */}
       <div className="flex items-center gap-6">
         <button
-          onClick={() => alert('No new notifications')}
+          onClick={() => {}}
           className="relative p-2 text-on-surface-variant hover:text-primary transition-all duration-200"
         >
           <Bell className="w-5 h-5" />

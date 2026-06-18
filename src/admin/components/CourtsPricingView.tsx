@@ -1,18 +1,19 @@
 import { useState } from 'react';
-import { 
-  Plus, 
-  MapPin, 
-  CheckCircle, 
-  AlertTriangle, 
-  Clock, 
-  Trash2, 
-  Save, 
+import {
+  Plus,
+  MapPin,
+  CheckCircle,
+  AlertTriangle,
+  Clock,
+  Trash2,
+  Save,
   X,
   CreditCard,
   ArrowLeft,
   Settings
 } from 'lucide-react';
 import { Court, DayOfWeek, TimePriceRange } from '../types';
+import { useToast, ToastContainer } from '../../components/Toast';
 
 interface CourtsPricingViewProps {
   courts: Court[];
@@ -27,6 +28,7 @@ export default function CourtsPricingView({
   onAddNewCourt,
   onUpdateCourtPricing
 }: CourtsPricingViewProps) {
+  const { toasts, toast, removeToast } = useToast();
   // Focus state: ID of court we are actively editing pricing for. Defaults to Court 1.
   const [selectedPricingCourtId, setSelectedPricingCourtId] = useState<number | null>(1);
   const [activeDay, setActiveDay] = useState<DayOfWeek>('Wed');
@@ -78,18 +80,19 @@ export default function CourtsPricingView({
   const handleSavePricing = () => {
     if (!selectedCourt) return;
     onUpdateCourtPricing(selectedCourt.id, activeDay, localRanges);
-    alert(`Successfully saved ${activeDay} pricing setup for ${selectedCourt.name}!`);
+    toast('success', 'Pricing saved', `${activeDay} pricing updated for ${selectedCourt.name}.`);
   };
 
   const handleDiscardChanges = () => {
     if (selectedCourt) {
       setLocalRanges([...(selectedCourt.pricing[activeDay] || [])]);
-      alert('Changes discarded.');
+      toast('info', 'Changes discarded');
     }
   };
 
   return (
     <div className="space-y-10 animate-fade-in">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
       {/* SECTION 1: Courts List Grid */}
       <section id="courts-list" className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 border-b border-outline-variant/30 pb-4">

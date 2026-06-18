@@ -83,14 +83,14 @@ export default function Sidebar({ onNewBookingClick, newBookingCount = 0, onClea
       {/* Footer Nav & Profile */}
       <div className="mt-auto space-y-1.5 pt-4 border-t border-outline-variant">
         <button
-          onClick={() => alert('Settings module opened (Simulated)')}
+          onClick={() => navigate('/admin/settings')}
           className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low transition-all rounded-lg text-left"
         >
           <Settings className="w-[18px] h-[18px] text-outline" />
           <span>Settings</span>
         </button>
         <button
-          onClick={() => alert('Support module opened (Simulated)')}
+          onClick={() => navigate('/admin/support')}
           className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low transition-all rounded-lg text-left"
         >
           <HelpCircle className="w-[18px] h-[18px] text-outline" />
@@ -128,7 +128,7 @@ export default function Sidebar({ onNewBookingClick, newBookingCount = 0, onClea
           </div>
           {onLogout && (
             <button
-              onClick={() => { if (window.confirm('Sign out of admin panel?')) onLogout(); }}
+              onClick={onLogout}
               className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50 transition-all rounded-lg text-left"
             >
               <LogOut className="w-[18px] h-[18px]" />

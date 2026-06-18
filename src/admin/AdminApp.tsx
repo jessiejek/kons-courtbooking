@@ -12,6 +12,8 @@ import DashboardView from './components/DashboardView';
 import BookingsView from './components/BookingsView';
 import CourtsPricingView from './components/CourtsPricingView';
 import AddEditCourtView from './components/AddEditCourtView';
+import { useToast, ToastContainer } from '../components/Toast';
+import ConfirmModal, { ConfirmOptions } from '../components/ConfirmModal';
 
 interface Props {
   role: 'user' | 'admin' | null;
@@ -88,6 +90,8 @@ const mapRow = (row: any): Booking => ({
 export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const { toasts, toast, removeToast } = useToast();
+  const [confirmOpts, setConfirmOpts] = useState<ConfirmOptions | null>(null);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [courts, setCourts] = useState<Court[]>([]);
@@ -170,11 +174,12 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
 
   const handleCreateBookingSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!nbCustomer.trim() || !nbPhone.trim()) { alert('Please fill out all fields.'); return; }
-    if (!isSupabaseEnabled || !supabase) { alert('Supabase not connected.'); return; }
+    if (!nbCustomer.trim() || !nbPhone.trim()) { toast('warning', 'Missing fields', 'Please fill out all required fields.'); return; }
+    if (!isSupabaseEnabled || !supabase) { toast('error', 'Not connected', 'Supabase is not connected.'); return; }
 
     const selectedCourt = courts.find(c => c.id === Number(nbCourtId)) || courts[0];
     const bookingRef = `BK-${Math.floor(1000 + Math.random() * 9000)}`;
+    const customerName = nbCustomer;
 
     const { error } = await supabase.from('bookings').insert({
       booking_ref: bookingRef,
@@ -183,7 +188,7 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
       end_time: nbTime,
       court_id: selectedCourt?.id ?? null,
       court_name: selectedCourt?.name ?? 'Center Court',
-      customer_name: nbCustomer,
+      customer_name: customerName,
       customer_phone: nbPhone,
       booking_status: nbStatus,
       payment_method: 'cash',
@@ -193,13 +198,13 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
 
     if (error) {
       console.error('[Supabase] admin booking insert error:', error);
-      alert('Failed to save booking. Please try again.');
+      toast('error', 'Failed to save booking', 'Please try again.');
       return;
     }
 
     setNbCustomer(''); setNbPhone(''); setNbDate(''); setNbAmount(1200); setIsNewBookingOpen(false);
     await loadBookings();
-    alert(`Booking created for ${nbCustomer}!`);
+    toast('success', 'Booking created', `Booking confirmed for ${customerName}.`);
   };
 
   const activeDetailBooking = bookings.find(b => b.bookingId === selectedBookingId);
@@ -214,16 +219,26 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
     setBookings(prev => prev.map(b => b.bookingId === bookingId ? { ...b, status: nextStatus } : b));
   };
 
-  const handleDeleteBooking = async (bookingId: string) => {
-    if (!confirm('Cancel and remove this booking?')) return;
-    if (!isSupabaseEnabled || !supabase) return;
-    const { error } = await supabase
-      .from('bookings')
-      .update({ booking_status: 'cancelled' })
-      .eq('booking_ref', bookingId);
-    if (error) { console.error('[Supabase] cancel booking error:', error); return; }
-    setBookings(prev => prev.map(b => b.bookingId === bookingId ? { ...b, status: 'cancelled' } : b));
-    setSelectedBookingId(null);
+  const handleDeleteBooking = (bookingId: string) => {
+    setConfirmOpts({
+      title: 'Cancel Booking',
+      message: 'This will mark the booking as cancelled. This action cannot be undone.',
+      confirmLabel: 'Yes, Cancel It',
+      variant: 'danger',
+      onCancel: () => setConfirmOpts(null),
+      onConfirm: async () => {
+        setConfirmOpts(null);
+        if (!isSupabaseEnabled || !supabase) return;
+        const { error } = await supabase
+          .from('bookings')
+          .update({ booking_status: 'cancelled' })
+          .eq('booking_ref', bookingId);
+        if (error) { console.error('[Supabase] cancel booking error:', error); toast('error', 'Failed to cancel', 'Please try again.'); return; }
+        setBookings(prev => prev.map(b => b.bookingId === bookingId ? { ...b, status: 'cancelled' } : b));
+        setSelectedBookingId(null);
+        toast('success', 'Booking cancelled');
+      },
+    });
   };
 
   // ── Realtime: new bookings arrive live ──────────────────
@@ -253,12 +268,21 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
 
   return (
     <div id="court-and-co-root" className="min-h-screen bg-background text-on-background flex font-sans">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+      {confirmOpts && <ConfirmModal {...confirmOpts} />}
       <Sidebar
         onNewBookingClick={() => setIsNewBookingOpen(true)}
         newBookingCount={newBookingCount}
         onClearNewBookingCount={() => setNewBookingCount(0)}
         currentUser={currentUser}
-        onLogout={onLogout}
+        onLogout={() => setConfirmOpts({
+          title: 'Sign Out',
+          message: 'Are you sure you want to sign out of the admin panel?',
+          confirmLabel: 'Sign Out',
+          variant: 'warning',
+          onCancel: () => setConfirmOpts(null),
+          onConfirm: () => { setConfirmOpts(null); onLogout(); },
+        })}
       />
       <div className="flex-1 ml-64 flex flex-col min-h-screen">
         <Header searchText={searchText} onSearchChange={setSearchText} backAction={backAction} />

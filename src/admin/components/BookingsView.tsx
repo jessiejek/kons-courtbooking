@@ -178,7 +178,7 @@ export default function BookingsView({
           {/* Time Picker Trigger */}
           <button 
             type="button" 
-            onClick={() => alert('Filter date option selected (This week is shown by default)')}
+            onClick={() => {}}
             className="flex items-center gap-2 bg-white border border-outline-variant rounded px-4 py-2 text-xs font-semibold text-on-surface hover:bg-surface-container-low transition-colors"
           >
             <Calendar className="w-4 h-4 text-outline" />

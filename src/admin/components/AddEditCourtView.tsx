@@ -1,17 +1,19 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { 
-  ArrowLeft, 
-  Clock, 
-  Trash2, 
-  Save, 
-  Sparkles, 
-  AlertOctagon, 
-  CheckCircle2, 
-  Hammer, 
+import {
+  ArrowLeft,
+  Clock,
+  Trash2,
+  Save,
+  Sparkles,
+  AlertOctagon,
+  CheckCircle2,
+  Hammer,
   EyeOff
 } from 'lucide-react';
 import { Court, CourtStatus, CourtSurface, DayOfWeek } from '../types';
 import { createDefaultPricingForDay } from '../data';
+import { useToast, ToastContainer } from '../../components/Toast';
+import ConfirmModal, { ConfirmOptions } from '../../components/ConfirmModal';
 
 interface AddEditCourtViewProps {
   editCourtId: number | 'new' | null;
@@ -38,6 +40,8 @@ export default function AddEditCourtView({
   const [closesAt, setClosesAt] = useState('22:00');
   const [defaultPrice, setDefaultPrice] = useState(350);
   const [status, setStatus] = useState<CourtStatus>('active');
+  const { toasts, toast, removeToast } = useToast();
+  const [confirmOpts, setConfirmOpts] = useState<ConfirmOptions | null>(null);
 
   // Load existing court state upon mounting or change
   useEffect(() => {
@@ -63,7 +67,7 @@ export default function AddEditCourtView({
     e.preventDefault();
 
     if (!name.trim()) {
-      alert('Please provide a court name.');
+      toast('warning', 'Court name required', 'Please provide a name for this court.');
       return;
     }
 
@@ -88,22 +92,30 @@ export default function AddEditCourtView({
     };
 
     onSaveCourt(updatedCourt);
-    alert(`Successfully ${existingCourt ? 'updated' : 'created'} ${name}!`);
-    onCancel();
+    toast('success', existingCourt ? 'Court updated' : 'Court created', `${name} has been saved.`);
+    setTimeout(onCancel, 800);
   };
 
   const handleDelete = () => {
     if (!existingCourt) return;
-    const confirmed = window.confirm(`Are you absolutely sure you want to permanently delete ${existingCourt.name}?`);
-    if (confirmed) {
-      onDeleteCourt(existingCourt.id);
-      alert(`${existingCourt.name} has been removed.`);
-      onCancel();
-    }
+    setConfirmOpts({
+      title: 'Delete Court',
+      message: `Are you sure you want to permanently delete "${existingCourt.name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+      onCancel: () => setConfirmOpts(null),
+      onConfirm: () => {
+        setConfirmOpts(null);
+        onDeleteCourt(existingCourt.id);
+        onCancel();
+      },
+    });
   };
 
   return (
     <div className="max-w-3xl mx-auto py-8 animate-fade-in pb-32">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+      {confirmOpts && <ConfirmModal {...confirmOpts} />}
       {/* Breadcrumbs Navigation */}
       <div className="mb-6">
         <button
