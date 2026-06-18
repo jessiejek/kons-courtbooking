@@ -147,8 +147,6 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
     const row = {
       name: court.name,
       surface_type: court.surfaceType,
-      opens_at: court.opensAt,
-      closes_at: court.closesAt,
       default_price: court.defaultPrice,
       status: court.status,
     };
