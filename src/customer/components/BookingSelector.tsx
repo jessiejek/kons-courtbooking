@@ -137,6 +137,7 @@ export default function BookingSelector({
   const [activePeriodFilter, setActivePeriodFilter] = useState<'All' | 'Morning' | 'Afternoon' | 'Evening' | 'Night'>('All');
   const [pricingRanges, setPricingRanges] = useState<PricingRange[]>([]);
   const [courtMeta, setCourtMeta] = useState<Record<string, CourtMeta>>({});
+  const [activeSlugs, setActiveSlugs] = useState<string[]>([]);
   const sliderDates = getDatesSlider();
 
   // Load courts + pricing from Supabase
@@ -148,12 +149,21 @@ export default function BookingSelector({
 
       if (courts) {
         const meta: Record<string, CourtMeta> = {};
+        const slugs: string[] = [];
         courts.forEach((c: any) => {
           meta[c.slug] = { dbId: c.id, useGlobal: c.use_global_pricing ?? true, defaultPrice: Number(c.default_price), name: c.name, surfaceType: c.surface_type ?? '' };
+          slugs.push(c.slug);
         });
         setCourtMeta(meta);
+        setActiveSlugs(slugs);
+        // If selected court is no longer active, switch to first active
         const current = courts.find((c: any) => c.slug === selectedCourtId);
-        if (current) onCourtDbIdChange?.(current.id);
+        if (current) {
+          onCourtDbIdChange?.(current.id);
+        } else if (courts.length > 0) {
+          setSelectedCourtId(courts[0].slug);
+          onCourtDbIdChange?.(courts[0].id);
+        }
       }
 
       if (pricing) {
@@ -168,7 +178,10 @@ export default function BookingSelector({
     load();
   }, []);
 
-  const COURTS = STATIC_COURTS;
+  // Only show active courts — filter static list by slugs from Supabase
+  const COURTS = activeSlugs.length > 0
+    ? STATIC_COURTS.filter(c => activeSlugs.includes(c.id))
+    : STATIC_COURTS;
   const selectedCourt = COURTS.find(c => c.id === selectedCourtId) || COURTS[0];
 
   // Get effective price for a given time slot
