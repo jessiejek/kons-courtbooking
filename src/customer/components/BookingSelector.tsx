@@ -1,9 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar as CalendarIcon, Clock, ShieldCheck, HelpCircle, ChevronLeft, ChevronRight, Info, AlertTriangle } from 'lucide-react';
 import { Court, TimeSlot } from '../types';
-import { COURTS, TIME_SLOTS_RAW } from '../data';
+import { COURTS as STATIC_COURTS, TIME_SLOTS_RAW } from '../data';
 import { useRealtimeSlots } from '../../hooks/useRealtimeSlots';
-import { isSupabaseEnabled } from '../../lib/supabase';
+import { isSupabaseEnabled, supabase } from '../../lib/supabase';
+
+interface PricingRange { start: string; end: string; rate: number; courtId: number | null; }
+
+// Returns the applicable rate for a given time slot from loaded pricing ranges
+const getRateForSlot = (
+  time: string,
+  courtId: string,
+  allRanges: PricingRange[],
+  courtDbId: number | null,
+  useGlobal: boolean,
+  defaultRate: number
+): number => {
+  const [h] = time.split(':').map(Number);
+  const slotMinutes = h * 60;
+
+  const toMinutes = (t: string) => {
+    const [hh, mm] = t.split(':').map(Number);
+    return hh * 60 + (mm || 0);
+  };
+
+  const inRange = (r: PricingRange) => {
+    const s = toMinutes(r.start);
+    const e = toMinutes(r.end);
+    if (e < s) return slotMinutes >= s || slotMinutes < e; // overnight
+    return slotMinutes >= s && slotMinutes < e;
+  };
+
+  // Try court-specific pricing first (if not using global)
+  if (!useGlobal && courtDbId) {
+    const courtRange = allRanges.find(r => r.courtId === courtDbId && inRange(r));
+    if (courtRange) return courtRange.rate;
+  }
+
+  // Fall back to global pricing
+  const globalRange = allRanges.find(r => r.courtId === null && inRange(r));
+  if (globalRange) return globalRange.rate;
+
+  return defaultRate;
+};
 
 interface BookingSelectorProps {
   onNavigate: (screen: 'landing' | 'booking' | 'checkout' | 'confirmed' | 'bookings-list' | 'booking-detail') => void;
@@ -91,8 +130,46 @@ export default function BookingSelector({
   onLogout,
 }: BookingSelectorProps) {
   const [activePeriodFilter, setActivePeriodFilter] = useState<'All' | 'Morning' | 'Afternoon' | 'Evening' | 'Night'>('All');
+  const [pricingRanges, setPricingRanges] = useState<PricingRange[]>([]);
+  const [courtMeta, setCourtMeta] = useState<Record<string, { dbId: number; useGlobal: boolean; defaultPrice: number }>>({});
   const sliderDates = getDatesSlider();
+
+  // Load courts + pricing from Supabase
+  useEffect(() => {
+    if (!isSupabaseEnabled || !supabase) return;
+    const load = async () => {
+      const { data: courts } = await supabase.from('courts').select('id, slug, default_price, use_global_pricing').eq('status', 'active');
+      const { data: pricing } = await supabase.from('court_pricing').select('court_id, start_time, end_time, rate');
+
+      if (courts) {
+        const meta: Record<string, { dbId: number; useGlobal: boolean; defaultPrice: number }> = {};
+        courts.forEach((c: any) => {
+          meta[c.slug] = { dbId: c.id, useGlobal: c.use_global_pricing ?? true, defaultPrice: Number(c.default_price) };
+        });
+        setCourtMeta(meta);
+      }
+
+      if (pricing) {
+        setPricingRanges(pricing.map((r: any) => ({
+          courtId: r.court_id,
+          start: r.start_time.slice(0, 5),
+          end: r.end_time.slice(0, 5),
+          rate: Number(r.rate),
+        })));
+      }
+    };
+    load();
+  }, []);
+
+  const COURTS = STATIC_COURTS;
   const selectedCourt = COURTS.find(c => c.id === selectedCourtId) || COURTS[0];
+
+  // Get effective price for a given time slot
+  const getSlotRate = (time: string): number => {
+    const meta = courtMeta[selectedCourtId];
+    if (!meta || pricingRanges.length === 0) return selectedCourt.pricePerHour;
+    return getRateForSlot(time, selectedCourtId, pricingRanges, meta.dbId, meta.useGlobal, meta.defaultPrice);
+  };
 
   // Live slot availability from Supabase — overrides mock data when connected
   const realtimeBookedSlots = useRealtimeSlots(selectedCourtId, selectedDate);
@@ -143,10 +220,10 @@ export default function BookingSelector({
     setSelectedSlots([]);
   };
 
-  // Compute calculated duration label
+  // Compute price per slot (time-based) and total
   const totalHours = selectedSlots.length;
-  const courtFee = totalHours * selectedCourt.pricePerHour;
-  const discount = totalHours > 2 ? 50 : 0; // custom discount for multi-hour sessions
+  const courtFee = selectedSlots.reduce((sum, time) => sum + getSlotRate(time), 0);
+  const discount = totalHours > 2 ? 50 : 0;
   const finalPrice = Math.max(0, courtFee - discount);
 
   // Formats selected times interval for summary display
@@ -339,7 +416,7 @@ export default function BookingSelector({
                         {court.id === 'court-1' ? 'Court 1 (Indoor)' : court.id === 'court-2' ? 'Court 2 (Outdoor)' : court.id === 'court-3' ? 'Court 3 (Indoor)' : 'Court 4 (Outdoor)'}
                       </h4>
                       <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-200/60 w-full text-[10px] font-mono">
-                        <span className="font-black text-blue-600">₱{court.pricePerHour}/hr</span>
+                        <span className="font-black text-blue-600">₱{courtMeta[court.id]?.defaultPrice ?? court.pricePerHour}/hr</span>
                         <span className="text-slate-400">★ {court.rating}</span>
                       </div>
                     </button>
@@ -427,7 +504,7 @@ export default function BookingSelector({
                           {slot.label}
                         </div>
                         <div className="text-[9px] font-mono text-slate-400 mt-1 leading-none">
-                          {slotBooked ? bookerLabel : `₱${selectedCourt.pricePerHour}/hr`}
+                          {slotBooked ? bookerLabel : `₱${getSlotRate(slot.time)}/hr`}
                         </div>
                       </div>
 
@@ -535,8 +612,15 @@ export default function BookingSelector({
             <div className="space-y-2.5 text-xs text-slate-600">
               <div className="flex justify-between">
                 <span>Court Base Fee</span>
-                <span className="font-mono text-slate-900 font-semibold">{selectedSlots.length > 0 ? `₱${selectedCourt.pricePerHour} × ${totalHours} hrs` : '₱0'}</span>
+                <span className="font-mono text-slate-900 font-semibold">
+                  {selectedSlots.length > 0 ? `₱${courtFee}` : '₱0'}
+                </span>
               </div>
+              {selectedSlots.length > 0 && (
+                <div className="text-[10px] text-slate-400 font-mono -mt-1 text-right">
+                  {selectedSlots.map(t => `${t} = ₱${getSlotRate(t)}`).join(' · ')}
+                </div>
+              )}
               <div className="flex justify-between">
                 <span>Rental Gear Allowance</span>
                 <span className="text-emerald-600 font-semibold uppercase font-mono">Free</span>
