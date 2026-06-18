@@ -152,10 +152,15 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
     };
     if (!isSupabaseEnabled || !supabase) { setCourts(prev => prev.some(c => c.id === court.id) ? prev.map(c => c.id === court.id ? court : c) : [...prev, court]); return; }
     const exists = courts.some(c => c.id === court.id);
+    let error;
     if (exists) {
-      await supabase.from('courts').update(row).eq('id', court.id);
+      ({ error } = await supabase.from('courts').update(row).eq('id', court.id));
     } else {
-      await supabase.from('courts').insert(row);
+      ({ error } = await supabase.from('courts').insert(row));
+    }
+    if (error) {
+      toast('error', 'Save failed', error.message);
+      return;
     }
     await loadCourts();
   };
