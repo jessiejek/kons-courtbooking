@@ -46,7 +46,7 @@ export default function PaymentsView({ toast, onPaymentActioned }: Props) {
       .eq('payment_status', 'pending_verification')
       .order('created_at', { ascending: false });
     setLoading(false);
-    if (error) { console.error(error); return; }
+    if (error) { console.error('[PaymentsView]', error); return; }
     setPayments((data ?? []).map((r: any) => ({
       id: r.id,
       bookingRef: r.booking_ref,
@@ -65,6 +65,17 @@ export default function PaymentsView({ toast, onPaymentActioned }: Props) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Realtime: reload when any booking is inserted or updated
+  useEffect(() => {
+    if (!isSupabaseEnabled || !supabase) return;
+    const channel = supabase
+      .channel('payments-view')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings' }, () => load())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings' }, () => load())
+      .subscribe();
+    return () => { supabase!.removeChannel(channel); };
+  }, [load]);
 
   const handleApprove = async (p: PaymentRow) => {
     if (!isSupabaseEnabled || !supabase) return;
