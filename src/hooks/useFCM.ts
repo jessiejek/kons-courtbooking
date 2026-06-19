@@ -8,10 +8,13 @@ export function useFCM(userEmail: string | null | undefined, role: 'user' | 'adm
 
     const setup = async () => {
       try {
+        // Register service worker explicitly
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') return;
 
-        const token = await getToken(messaging!, { vapidKey: VAPID_KEY });
+        const token = await getToken(messaging!, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration });
         if (!token) return;
 
         // Upsert token keyed by email — updates if same email logs in again
