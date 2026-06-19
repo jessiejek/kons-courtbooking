@@ -104,9 +104,11 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
   const [nbPhone, setNbPhone] = useState('');
   const [nbDate, setNbDate] = useState('');
   const [nbTime, setNbTime] = useState('09:00');
+  const [nbEndTime, setNbEndTime] = useState('10:00');
   const [nbCourtId, setNbCourtId] = useState<number>(1);
-  const [nbStatus, setNbStatus] = useState<BookingStatus>('pending');
-  const [nbAmount, setNbAmount] = useState(1200);
+  const [nbStatus, setNbStatus] = useState<BookingStatus>('confirmed');
+  const [nbAmount, setNbAmount] = useState(300);
+  const [nbPaymentMethod, setNbPaymentMethod] = useState<'cash' | 'gcash'>('cash');
 
   useEffect(() => {
     loadCourts();
@@ -192,14 +194,14 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
       booking_ref: bookingRef,
       booking_date: nbDate,
       start_time: nbTime,
-      end_time: nbTime,
+      end_time: nbEndTime,
       court_id: selectedCourt?.id ?? null,
       court_name: selectedCourt?.name ?? 'Center Court',
       customer_name: customerName,
       customer_phone: nbPhone,
       booking_status: nbStatus,
-      payment_method: 'cash',
-      payment_status: nbStatus === 'paid' ? 'paid' : 'pending',
+      payment_method: nbPaymentMethod,
+      payment_status: 'paid',
       total_amount: Number(nbAmount),
     });
 
@@ -209,7 +211,7 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
       return;
     }
 
-    setNbCustomer(''); setNbPhone(''); setNbDate(''); setNbAmount(1200); setIsNewBookingOpen(false);
+    setNbCustomer(''); setNbPhone(''); setNbDate(''); setNbAmount(300); setNbTime('09:00'); setNbEndTime('10:00'); setNbPaymentMethod('cash'); setIsNewBookingOpen(false);
     await loadBookings();
     toast('success', 'Booking created', `Booking confirmed for ${customerName}.`);
   };
@@ -457,9 +459,9 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
               <div>
                 <h4 className="text-lg font-bold font-headline text-on-surface flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-primary" />
-                  <span>Book a New Court</span>
+                  <span>Walk-in Booking</span>
                 </h4>
-                <p className="text-xs text-on-surface-variant mt-1 font-medium">Manually register a reservation on terminal.</p>
+                <p className="text-xs text-on-surface-variant mt-1 font-medium">Register a walk-in guest at the front desk.</p>
               </div>
               <button onClick={() => setIsNewBookingOpen(false)} className="p-1 hover:bg-surface-container-high rounded-full text-on-surface-variant transition-colors">
                 <X className="w-5 h-5" />
@@ -483,15 +485,20 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
                       className="w-full bg-white border border-outline-variant rounded-lg pl-10 pr-3 py-2 text-sm focus:border-primary focus:ring-0 font-mono" />
                   </div>
                 </div>
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">Reserve Date</label>
+                  <input type="date" required value={nbDate} onChange={(e) => setNbDate(e.target.value)}
+                    className="w-full bg-white border border-outline-variant rounded-lg p-2 text-sm focus:border-primary focus:ring-0 font-medium" />
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">Reserve Date</label>
-                    <input type="date" required value={nbDate} onChange={(e) => setNbDate(e.target.value)}
+                    <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">Start Time</label>
+                    <input type="time" required value={nbTime} onChange={(e) => setNbTime(e.target.value)}
                       className="w-full bg-white border border-outline-variant rounded-lg p-2 text-sm focus:border-primary focus:ring-0 font-medium" />
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">Slot Hour</label>
-                    <input type="time" required value={nbTime} onChange={(e) => setNbTime(e.target.value)}
+                    <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">End Time</label>
+                    <input type="time" required value={nbEndTime} onChange={(e) => setNbEndTime(e.target.value)}
                       className="w-full bg-white border border-outline-variant rounded-lg p-2 text-sm focus:border-primary focus:ring-0 font-medium" />
                   </div>
                 </div>
@@ -513,13 +520,24 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">Payment Status</label>
-                  <select value={nbStatus} onChange={(e) => setNbStatus(e.target.value as BookingStatus)}
-                    className="w-full bg-white border border-outline-variant rounded-lg p-2 text-sm focus:border-primary focus:ring-0 font-semibold cursor-pointer uppercase tracking-wider text-xs">
-                    <option value="pending">Pending</option>
-                    <option value="paid">Paid</option>
-                    <option value="confirmed">Confirmed</option>
-                  </select>
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">Payment Method</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['cash', 'gcash'] as const).map((method) => (
+                      <button
+                        key={method}
+                        type="button"
+                        onClick={() => setNbPaymentMethod(method)}
+                        className={`py-2.5 rounded-lg border text-xs font-bold uppercase tracking-wider transition-all ${
+                          nbPaymentMethod === method
+                            ? 'bg-primary text-white border-primary'
+                            : 'bg-white text-on-surface-variant border-outline-variant hover:border-outline'
+                        }`}
+                      >
+                        {method === 'cash' ? '💵 Cash' : '📱 GCash'}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-on-surface-variant font-mono mt-1">Walk-in payment is collected at the front desk. Booking is marked as paid.</p>
                 </div>
               </div>
               <div className="bg-surface-container p-4 flex justify-end gap-3 border-t border-outline-variant/60">
@@ -529,7 +547,7 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
                 </button>
                 <button type="submit"
                   className="bg-primary hover:opacity-95 text-white font-bold text-xs uppercase tracking-wider px-8 py-2 rounded-lg shadow-sm">
-                  Create Reservation
+                  Confirm Walk-in
                 </button>
               </div>
             </form>
