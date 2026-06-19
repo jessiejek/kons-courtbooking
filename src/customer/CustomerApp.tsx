@@ -32,7 +32,7 @@ const SCREEN_TO_PATH: Record<Screen, string> = {
 export default function CustomerApp({ role, onLogin, onLogout, currentUser }: Props) {
   const navigate = useNavigate();
 
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; });
   const [selectedCourtId, setSelectedCourtId] = useState('court-1');
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [cartTimeLeft, setCartTimeLeft] = useState<number>(600);

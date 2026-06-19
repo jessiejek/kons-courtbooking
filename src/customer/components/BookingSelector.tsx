@@ -75,7 +75,7 @@ const getDatesSlider = () => {
   for (let i = 0; i < 5; i++) {
     const d = new Date(baseDate);
     d.setDate(baseDate.getDate() + i);
-    const dateStr = d.toISOString().split('T')[0];
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     dates.push({
       dateStr,
       dayName: daysOfWeek[d.getDay()],
