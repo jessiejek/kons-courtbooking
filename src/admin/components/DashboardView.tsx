@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { 
   TrendingUp, 
   Clock, 
@@ -25,10 +25,13 @@ export default function DashboardView({
   onOpenBookingDetails
 }: DashboardViewProps) {
   const [timeFilter, setTimeFilter] = useState<'today' | 'week' | 'month' | 'custom'>('today');
+  const [showCustomModal, setShowCustomModal] = useState(false);
   const todayD = new Date();
   const todayStr = `${todayD.getFullYear()}-${String(todayD.getMonth()+1).padStart(2,'0')}-${String(todayD.getDate()).padStart(2,'0')}`;
   const [customFrom, setCustomFrom] = useState(todayStr);
   const [customTo, setCustomTo] = useState(todayStr);
+  const [pendingFrom, setPendingFrom] = useState(todayStr);
+  const [pendingTo, setPendingTo] = useState(todayStr);
 
   const activeCourtsCount = courts.filter(c => c.status === 'active').length;
   const totalCourtsCount = courts.length;
@@ -153,40 +156,17 @@ export default function DashboardView({
             </button>
           ))}
           <button
-            onClick={() => setTimeFilter('custom')}
+            onClick={() => { setPendingFrom(customFrom); setPendingTo(customTo); setShowCustomModal(true); }}
             className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all border-l border-outline-variant/60 flex items-center gap-1.5 uppercase tracking-wider ${
               timeFilter === 'custom'
                 ? 'bg-secondary-container text-primary'
                 : 'text-on-surface-variant hover:text-primary'
             }`}
           >
-            <span>Custom</span>
+            <span>{timeFilter === 'custom' ? `${customFrom} – ${customTo}` : 'Custom'}</span>
             <Calendar className="w-3.5 h-3.5" />
           </button>
         </div>
-
-        {/* Custom date range inputs */}
-        {timeFilter === 'custom' && (
-          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-outline-variant/30">
-            <span className="text-xs text-on-surface-variant font-medium">From</span>
-            <input
-              type="date"
-              value={customFrom}
-              max={customTo}
-              onChange={e => setCustomFrom(e.target.value)}
-              className="border border-outline-variant rounded px-2 py-1 text-xs text-on-surface bg-white focus:outline-none focus:border-primary"
-            />
-            <span className="text-xs text-on-surface-variant font-medium">To</span>
-            <input
-              type="date"
-              value={customTo}
-              min={customFrom}
-              max={todayStr}
-              onChange={e => setCustomTo(e.target.value)}
-              className="border border-outline-variant rounded px-2 py-1 text-xs text-on-surface bg-white focus:outline-none focus:border-primary"
-            />
-          </div>
-        )}
       </div>
 
       {/* Stats Bento Grid */}
@@ -417,6 +397,55 @@ export default function DashboardView({
           </table>
         </div>
       </div>
+
+      {/* Custom date range modal */}
+      {showCustomModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+            <div className="px-6 py-4 border-b border-outline-variant flex justify-between items-center">
+              <h3 className="font-semibold text-base text-on-surface">Select Date Range</h3>
+              <button onClick={() => setShowCustomModal(false)} className="text-on-surface-variant hover:text-on-surface text-xl leading-none">&times;</button>
+            </div>
+            <div className="px-6 py-6 space-y-5">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">From</label>
+                <input
+                  type="date"
+                  value={pendingFrom}
+                  max={pendingTo}
+                  onChange={e => setPendingFrom(e.target.value)}
+                  className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm text-on-surface bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">To</label>
+                <input
+                  type="date"
+                  value={pendingTo}
+                  min={pendingFrom}
+                  max={todayStr}
+                  onChange={e => setPendingTo(e.target.value)}
+                  className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm text-on-surface bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-outline-variant flex gap-3 justify-end">
+              <button
+                onClick={() => setShowCustomModal(false)}
+                className="px-4 py-2 text-sm font-semibold text-on-surface-variant hover:text-on-surface rounded-lg border border-outline-variant hover:border-on-surface-variant transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { setCustomFrom(pendingFrom); setCustomTo(pendingTo); setTimeFilter('custom'); setShowCustomModal(false); }}
+                className="px-4 py-2 text-sm font-semibold bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
