@@ -427,7 +427,7 @@ export default function AddEditCourtView({
         )}
 
         {/* STICKY FOOTER ACTIONS BAR */}
-        <footer className="fixed bottom-0 left-64 right-0 bg-white/90 backdrop-blur-md border-t border-outline-variant px-10 py-5 z-40">
+        <footer className="fixed bottom-0 left-0 lg:left-64 right-0 bg-white/90 backdrop-blur-md border-t border-outline-variant px-4 lg:px-10 py-4 z-40">
           <div className="max-w-3xl mx-auto flex items-center justify-between">
             <button
               type="button"
