@@ -1,7 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Check, ClipboardList, PlusCircle, Download, MapPin } from 'lucide-react';
 import { Booking } from '../types';
 import BookingReceiptPDF from './BookingReceiptPDF';
+import { supabase, isSupabaseEnabled } from '../../lib/supabase';
 
 interface ConfirmedPageProps {
   onNavigate: (screen: 'landing' | 'booking' | 'checkout' | 'confirmed' | 'bookings-list' | 'booking-detail') => void;
@@ -15,6 +16,25 @@ interface ConfirmedPageProps {
 export default function ConfirmedPage({ onNavigate, booking, onOpenLogin, role, onLogout, currentUser }: ConfirmedPageProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [liveStatus, setLiveStatus] = useState<string | null>(null);
+
+  // Realtime: watch this booking for status changes
+  useEffect(() => {
+    if (!isSupabaseEnabled || !supabase || !booking?.id) return;
+    const channel = supabase
+      .channel(`confirmed-${booking.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'bookings',
+        filter: `booking_ref=eq.${booking.id}`,
+      }, (payload) => {
+        const newStatus = payload.new?.booking_status;
+        if (newStatus) setLiveStatus(newStatus);
+      })
+      .subscribe();
+    return () => { supabase!.removeChannel(channel); };
+  }, [booking?.id]);
 
   const details = booking || {
     id: 'SPC-88219',
@@ -106,19 +126,36 @@ export default function ConfirmedPage({ onNavigate, booking, onOpenLogin, role, 
       <div className="flex-1 flex flex-col items-center justify-center p-4">
         <div className="max-w-xl w-full text-center space-y-6">
 
-          {/* Pending badge */}
-          <div className="relative mx-auto w-20 h-20 bg-amber-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/20">
-            <div className="absolute inset-0 rounded-full border border-amber-400 animate-ping opacity-20" />
-            <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
-            </svg>
-          </div>
+          {/* Status badge — updates live */}
+          {liveStatus === 'confirmed' || liveStatus === 'paid' ? (
+            <div className="relative mx-auto w-20 h-20 bg-[#00694c] rounded-full flex items-center justify-center shadow-lg shadow-[#00694c]/30">
+              <Check className="w-10 h-10 text-white" strokeWidth={3} />
+            </div>
+          ) : (
+            <div className="relative mx-auto w-20 h-20 bg-amber-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/20">
+              <div className="absolute inset-0 rounded-full border border-amber-400 animate-ping opacity-20" />
+              <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+              </svg>
+            </div>
+          )}
 
           <div className="space-y-2">
-            <h1 className="text-3xl font-sans font-black tracking-tight text-slate-900">Payment Submitted!</h1>
-            <p className="text-slate-600 text-sm max-w-sm mx-auto leading-relaxed">
-              Your booking is <span className="font-bold text-amber-600">pending approval</span>. Our staff will verify your payment and confirm your slot shortly.
-            </p>
+            {liveStatus === 'confirmed' || liveStatus === 'paid' ? (
+              <>
+                <h1 className="text-3xl font-sans font-black tracking-tight text-slate-900">Booking Confirmed!</h1>
+                <p className="text-slate-600 text-sm max-w-sm mx-auto leading-relaxed">
+                  Your slot has been <span className="font-bold text-[#00694c]">confirmed</span>. See you on the court!
+                </p>
+              </>
+            ) : (
+              <>
+                <h1 className="text-3xl font-sans font-black tracking-tight text-slate-900">Payment Submitted!</h1>
+                <p className="text-slate-600 text-sm max-w-sm mx-auto leading-relaxed">
+                  Your booking is <span className="font-bold text-amber-600">pending approval</span>. Our staff will verify your payment and confirm your slot shortly.
+                </p>
+              </>
+            )}
           </div>
 
           {/* Ticket stub */}
