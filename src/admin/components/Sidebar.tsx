@@ -4,8 +4,7 @@ import {
   MapPin,
   CreditCard,
   Calendar,
-  Settings,
-  HelpCircle,
+  UserPlus,
   Plus,
   LogOut
 } from 'lucide-react';
@@ -27,6 +26,7 @@ export default function Sidebar({ onNewBookingClick, newBookingCount = 0, onClea
     { id: 'locations', label: 'Locations', icon: MapPin, path: '/admin/locations', badge: 0 },
     { id: 'courts', label: 'Courts & Pricing', icon: CreditCard, path: '/admin/courts', badge: 0 },
     { id: 'bookings', label: 'Bookings', icon: Calendar, path: '/admin/bookings', badge: newBookingCount },
+    { id: 'walkin', label: 'Walk-in', icon: UserPlus, path: '/admin/walkin', badge: 0 },
   ] as const;
 
   const isActive = (path: string) => {

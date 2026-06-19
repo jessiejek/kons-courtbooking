@@ -14,6 +14,7 @@ import CourtsPricingView from './components/CourtsPricingView';
 import AddEditCourtView from './components/AddEditCourtView';
 import { useToast, ToastContainer } from '../components/Toast';
 import ConfirmModal, { ConfirmOptions } from '../components/ConfirmModal';
+import WalkinView from './components/WalkinView';
 
 interface Props {
   role: 'user' | 'admin' | null;
@@ -340,6 +341,14 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
             } />
 
             <Route path="/locations" element={<LocationsView />} />
+
+            <Route path="/walkin" element={
+              <WalkinView
+                courts={courts}
+                onWalkinCreated={loadBookings}
+                toast={toast}
+              />
+            } />
 
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Routes>
