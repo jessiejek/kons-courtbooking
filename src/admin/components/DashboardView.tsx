@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { 
   TrendingUp, 
-  DollarSign, 
   Clock, 
   Users, 
   Calendar,
@@ -143,7 +142,7 @@ export default function DashboardView({
         <div className="bg-white border border-outline-variant p-5 rounded-lg hover:border-primary transition-all duration-300 relative group overflow-hidden">
           <div className="flex justify-between items-start mb-4">
             <span className="p-2 bg-surface-container-low rounded-lg text-primary">
-              <DollarSign className="w-5 h-5 text-primary" />
+              <span className="font-black text-primary text-base">₱</span>
             </span>
             <span className="text-xs font-bold text-secondary bg-secondary-container/50 px-2 py-0.5 rounded flex items-center gap-1">
               <TrendingUp className="w-3 h-3 text-secondary" /> +8%
