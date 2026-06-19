@@ -452,7 +452,7 @@ export default function CheckoutPage({
                     onClick={() => setPaymentMethod(method)}
                     className={`flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-mono font-bold uppercase transition-all cursor-pointer ${
                       isActive
-                        ? 'bg-slate-900 text-white shadow-sm'
+                        ? 'bg-[#00694c] text-white shadow-sm'
                         : 'bg-slate-55 hover:bg-slate-100 text-slate-600'
                     }`}
                   >
@@ -775,7 +775,7 @@ export default function CheckoutPage({
                 onClick={handlePaySubmit}
                 className={`w-full py-4 rounded-xl font-mono text-xs uppercase tracking-wider font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                   isFormValid() && !isProcessing
-                    ? 'bg-[#00694c] hover:bg-slate-900 text-white shadow-lg'
+                    ? 'bg-[#00694c] hover:bg-[#005a40] text-white shadow-lg'
                     : 'bg-slate-150 text-slate-400 cursor-not-allowed border border-slate-200'
                 }`}
               >

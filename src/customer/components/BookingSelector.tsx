@@ -364,7 +364,7 @@ export default function BookingSelector({
                       }}
                       className={`flex flex-col items-center justify-center p-3.5 rounded-xl border min-w-[70px] shrink-0 transition-all cursor-pointer ${
                         isMarkedSelected 
-                          ? 'bg-slate-900 border-slate-900 text-white shadow-md' 
+                          ? 'bg-[#00694c] border-[#00694c] text-white shadow-md'
                           : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-800'
                       }`}
                     >
@@ -465,19 +465,19 @@ export default function BookingSelector({
               </div>
 
               {/* Court Spotlight Detail */}
-              <div className="bg-slate-900 text-[#F3F4F1] p-4 rounded-xl border border-slate-805 flex flex-col md:flex-row gap-4 items-center mt-4">
-                <img 
-                  src={selectedCourt.image} 
-                  alt={selectedCourt.name} 
+              <div className="bg-[#f0f4f1] text-[#1a1c1b] p-4 rounded-xl border border-[#bccac1] flex flex-col md:flex-row gap-4 items-center mt-4">
+                <img
+                  src={selectedCourt.image}
+                  alt={selectedCourt.name}
                   className="w-full md:w-28 h-20 object-cover rounded-lg shrink-0"
                   referrerPolicy="no-referrer"
                 />
                 <div className="space-y-1 w-full text-center md:text-left">
                   <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-                    <h3 className="font-sans font-extrabold text-sm text-white">{courtMeta[selectedCourtId]?.name || selectedCourt.name}</h3>
-                    <span className="text-[9px] font-mono bg-[#00694c]/20 text-[#6edba8] px-1.5 py-0.5 rounded font-bold uppercase">{courtMeta[selectedCourtId]?.surfaceType || selectedCourt.type} Layout</span>
+                    <h3 className="font-sans font-extrabold text-sm text-[#1a1c1b]">{courtMeta[selectedCourtId]?.name || selectedCourt.name}</h3>
+                    <span className="text-[9px] font-mono bg-[#00694c]/15 text-[#005a40] px-1.5 py-0.5 rounded font-bold uppercase">{courtMeta[selectedCourtId]?.surfaceType || selectedCourt.type} Layout</span>
                   </div>
-                  <p className="text-xs text-slate-300 leading-relaxed max-w-xl">{selectedCourt.description}</p>
+                  <p className="text-xs text-[#3d4943] leading-relaxed max-w-xl">{selectedCourt.description}</p>
                 </div>
               </div>
             </div>
@@ -504,7 +504,7 @@ export default function BookingSelector({
                     onClick={() => setActivePeriodFilter(period)}
                     className={`px-4 py-1.5 rounded-lg text-xs font-mono font-bold uppercase transition-all cursor-pointer shrink-0 ${
                       activePeriodFilter === period
-                        ? 'bg-slate-900 text-white'
+                        ? 'bg-[#00694c] text-white'
                         : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
                     }`}
                   >
@@ -553,7 +553,7 @@ export default function BookingSelector({
                           Booked
                         </span>
                       ) : isSlotCurrentlySelected ? (
-                        <span className="text-[9px] font-mono bg-slate-900 text-white px-1.5 py-0.5 rounded font-black uppercase">
+                        <span className="text-[9px] font-mono bg-[#00694c] text-white px-1.5 py-0.5 rounded font-black uppercase">
                           Added
                         </span>
                       ) : (
@@ -686,7 +686,7 @@ export default function BookingSelector({
                 disabled={selectedSlots.length === 0}
                 className={`w-full py-4 rounded-xl font-mono text-xs uppercase tracking-wider font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                   selectedSlots.length > 0
-                    ? 'bg-[#00694c] hover:bg-slate-900 text-white shadow-lg shadow-[#00694c]/10 active:scale-95'
+                    ? 'bg-[#00694c] hover:bg-[#005a40] text-white shadow-lg shadow-[#00694c]/10 active:scale-95'
                     : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                 }`}
               >

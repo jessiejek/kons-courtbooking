@@ -225,7 +225,7 @@ export default function ConfirmedPage({ onNavigate, booking, onOpenLogin, role, 
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <button
               onClick={() => onNavigate('bookings-list')}
-              className="flex-1 py-4 bg-slate-900 text-white hover:bg-slate-800 font-mono text-xs font-bold uppercase rounded-xl active:scale-95 transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+              className="flex-1 py-4 bg-[#1a1c1b] text-white hover:bg-[#2d3330] font-mono text-xs font-bold uppercase rounded-xl active:scale-95 transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <ClipboardList className="w-4 h-4" /> View My Bookings
             </button>

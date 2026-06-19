@@ -355,7 +355,7 @@ export default function BookingDetailPage({
                 <button
                   type="button"
                   onClick={() => setShowMapModal(true)}
-                  className="p-3 bg-slate-900 text-white hover:bg-slate-800 font-mono text-[10px] uppercase font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all outline-none border-none cursor-pointer"
+                  className="p-3 bg-[#00694c] text-white hover:bg-[#005a40] font-mono text-[10px] uppercase font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all outline-none border-none cursor-pointer"
                 >
                   <MapPin className="w-3.5 h-3.5 text-[#6edba8]" /> Get Directions
                 </button>
@@ -380,17 +380,17 @@ export default function BookingDetailPage({
       {/* MODAL 1: Cancellation Warnings (interactive) */}
       {showCancelModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 text-white border border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl relative">
-            <h3 className="font-sans font-black text-white text-lg flex items-center gap-2">
+          <div className="bg-white text-[#1a1c1b] border border-slate-200 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl relative">
+            <h3 className="font-sans font-black text-[#1a1c1b] text-lg flex items-center gap-2">
               <ShieldAlert className="w-5 h-5 text-[#BA1A1A]" /> Cancel Court Playing?
             </h3>
-            <p className="text-xs text-slate-450 leading-relaxed">
+            <p className="text-xs text-slate-600 leading-relaxed">
               Are you sure you want to cancel booking <strong>#{booking.id}</strong>? Cancellation complies with our 24h bylaws. A coupon load credit of <strong>₱{booking.price}</strong> will be loaded automatically to your profile phone wallet.
             </p>
             <div className="flex gap-3 pt-2">
               <button
                 onClick={() => setShowCancelModal(false)}
-                className="flex-1 py-2.5 border border-slate-700 hover:border-white text-slate-400 hover:text-white font-mono text-xs uppercase font-semibold rounded-lg cursor-pointer"
+                className="flex-1 py-2.5 border border-slate-300 hover:border-slate-500 text-slate-600 hover:text-slate-900 font-mono text-xs uppercase font-semibold rounded-lg cursor-pointer"
               >
                 Go Back
               </button>

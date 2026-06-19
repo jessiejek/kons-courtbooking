@@ -161,30 +161,30 @@ export default function BookingsHistory({
       </header>
 
       {/* Hero Welcome Banner */}
-      <section className="bg-[#111412] text-white py-8 px-6 border-b border-white/5">
+      <section className="bg-[#00694c] text-white py-8 px-6 border-b border-[#005a40]/30">
         <div className="max-w-7xl w-full mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <span className="text-[10px] bg-[#00694c]/10 text-[#6edba8] border border-[#00694c]/20 font-mono font-bold px-2.5 py-1 rounded-full uppercase">
+            <span className="text-[10px] bg-white/20 text-white border border-white/30 font-mono font-bold px-2.5 py-1 rounded-full uppercase">
               Authenticated Profile
             </span>
             <h2 className="text-3xl font-sans font-black tracking-tight text-white mt-2 leading-tight flex items-center gap-3">
               My reservations
-              {isFetching && <RefreshCw className="w-5 h-5 text-[#6edba8] animate-spin" />}
+              {isFetching && <RefreshCw className="w-5 h-5 text-white/70 animate-spin" />}
             </h2>
-            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+            <p className="text-xs text-white/70 mt-1 leading-relaxed">
               Welcome back, {currentUser?.name ?? 'Player'}. Easily track schedules, cancel bookings, or download transaction receipts.
             </p>
           </div>
 
-          <div className="flex gap-3 bg-slate-800/60 p-4 rounded-xl border border-slate-700/50 w-full md:w-auto text-xs">
+          <div className="flex gap-3 bg-white/15 p-4 rounded-xl border border-white/20 w-full md:w-auto text-xs">
             <div>
-              <span className="block text-[9px] font-mono uppercase text-slate-400">Upcoming Plays</span>
-              <span className="block text-2xl font-black text-[#6edba8] mt-1">
+              <span className="block text-[9px] font-mono uppercase text-white/60">Upcoming Plays</span>
+              <span className="block text-2xl font-black text-white mt-1">
                 {bookings.filter(b => b.status === 'Upcoming').length} slots
               </span>
             </div>
-            <div className="border-l border-zinc-700 pl-4">
-              <span className="block text-[9px] font-mono uppercase text-slate-400">Total Playtime</span>
+            <div className="border-l border-white/20 pl-4">
+              <span className="block text-[9px] font-mono uppercase text-white/60">Total Playtime</span>
               <span className="block text-2xl font-black text-white mt-1">
                 {bookings.filter(b => b.status === 'Past').length * 2 + bookings.filter(b => b.status === 'Upcoming').length * 2} hrs
               </span>
@@ -206,7 +206,7 @@ export default function BookingsHistory({
                 onClick={() => setActiveFilterTab(tab)}
                 className={`px-4 py-2 rounded-lg text-xs font-mono font-bold uppercase transition-all cursor-pointer ${
                   activeFilterTab === tab
-                    ? 'bg-slate-900 text-white hover:bg-slate-850 shadow-sm'
+                    ? 'bg-[#00694c] text-white shadow-sm'
                     : 'bg-slate-50 hover:bg-slate-100 text-slate-600'
                 }`}
               >
@@ -255,7 +255,7 @@ export default function BookingsHistory({
                         </span>
                       )}
                       {booking.status === 'Past' && (
-                        <span className="text-[10px] bg-zinc-800/90 text-[#F1F5F9] font-mono font-bold uppercase px-2.5 py-1 rounded-full shadow-sm">
+                        <span className="text-[10px] bg-slate-200 text-slate-700 font-mono font-bold uppercase px-2.5 py-1 rounded-full shadow-sm">
                           Past Play
                         </span>
                       )}
@@ -314,7 +314,7 @@ export default function BookingsHistory({
             </p>
             <button
               onClick={() => onNavigate('booking')}
-              className="px-5 py-2.5 bg-[#00694c] text-white font-mono text-xs font-bold uppercase rounded-lg hover:bg-slate-900 hover:text-white transition-all cursor-pointer"
+              className="px-5 py-2.5 bg-[#00694c] text-white font-mono text-xs font-bold uppercase rounded-lg hover:bg-[#005a40] transition-all cursor-pointer"
             >
               Start New Booking
             </button>
