@@ -539,7 +539,7 @@ export default function BookingSelector({
                 <span className="text-xs font-mono text-slate-500">Pick hours of operation</span>
               </div>
               <h2 className="text-xl font-sans font-extrabold text-[#05140B] mb-4">
-                Available playing schedules
+                Available playing schedules on <span className="text-[#00694c]">{new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
               </h2>
 
               {/* Interval period selector tabs */}
