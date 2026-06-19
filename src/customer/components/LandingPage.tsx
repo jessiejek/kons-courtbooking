@@ -120,7 +120,7 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
           {/* CTA cluster */}
           <div className="flex items-center gap-3">
             {role ? (
-              <div className="hidden md:flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5">
                 {currentUser?.avatar
                   ? <img src={currentUser.avatar} referrerPolicy="no-referrer" className="w-8 h-8 rounded-full border-2 border-[#00694c]/30 object-cover" />
                   : <div className="w-8 h-8 rounded-full bg-[#00694c] flex items-center justify-center text-white text-xs font-bold">{currentUser?.name?.[0]?.toUpperCase() ?? 'U'}</div>
@@ -133,7 +133,7 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
             ) : (
               <button
                 onClick={onOpenLogin}
-                className={`hidden md:block text-[11px] font-semibold uppercase tracking-wider px-4 py-2 rounded-lg border transition-all ${
+                className={`text-[11px] font-semibold uppercase tracking-wider px-4 py-2 rounded-lg border transition-all ${
                   scrolled
                     ? 'border-[#bccac1] text-[#3d4943] hover:border-[#00694c] hover:text-[#00694c]'
                     : 'border-white/40 text-white hover:bg-white/10'
