@@ -26,20 +26,37 @@ export default function DashboardView({
 }: DashboardViewProps) {
   const [timeFilter, setTimeFilter] = useState<'today' | 'week' | 'month' | 'custom'>('today');
 
-  // Let's compute some realistic metrics based on current state to make it interactive and super polished
-  const totalBookingsCount = bookings.filter(b => b.status !== 'cancelled').length;
   const activeCourtsCount = courts.filter(c => c.status === 'active').length;
   const totalCourtsCount = courts.length;
 
-  // Revenue computation
+  // Today string
+  const todayD = new Date();
+  const todayStr = `${todayD.getFullYear()}-${String(todayD.getMonth()+1).padStart(2,'0')}-${String(todayD.getDate()).padStart(2,'0')}`;
+
+  // Today's bookings count
+  const todayBookings = bookings.filter(b => b.date === todayStr && b.status !== 'cancelled');
+
+  // Revenue: this month confirmed/paid bookings
   const totalRevenue = bookings
-    .filter(b => b.status === 'paid' || b.status === 'completed' || b.status === 'confirmed')
+    .filter(b => (b.status === 'paid' || b.status === 'completed' || b.status === 'confirmed') && b.date?.startsWith(`${todayD.getFullYear()}-${String(todayD.getMonth()+1).padStart(2,'0')}`))
     .reduce((sum, b) => sum + b.amount, 0);
 
-  // Occupancy: active bookings / (courts * 16 operating hours)
-  const activeBookingsCount = bookings.filter(b => b.status === 'confirmed' || b.status === 'paid').length;
-  const totalCapacity = Math.max(1, activeCourtsCount * 16);
-  const occupancyRate = Math.min(100, Math.round((activeBookingsCount / totalCapacity) * 100));
+  // Occupancy: confirmed slots today / (active courts * 24 slots)
+  const confirmedTodaySlots = bookings
+    .filter(b => b.date === todayStr && (b.status === 'confirmed' || b.status === 'paid'))
+    .reduce((sum, b) => sum + (Math.max(1, (parseInt(b.endTime) || 0) - (parseInt(b.time) || 0))), 0);
+  const totalCapacity = Math.max(1, activeCourtsCount * 24);
+  const occupancyRate = Math.min(100, Math.round((confirmedTodaySlots / totalCapacity) * 100));
+
+  // Per-court occupancy (all-time confirmed slots / court's share of total capacity)
+  const courtOccupancy = courts.map(c => {
+    const slots = bookings
+      .filter(b => b.courtId === c.id && (b.status === 'confirmed' || b.status === 'paid'))
+      .reduce((sum, b) => sum + (Math.max(1, (parseInt(b.endTime) || 0) - (parseInt(b.time) || 0))), 0);
+    // base capacity: 24 slots × last 30 days
+    const cap = 24 * 30;
+    return { ...c, pct: Math.min(100, Math.round((slots / cap) * 100)) };
+  });
 
   // Format currency
   const formatCurrency = (val: number) => {
@@ -126,15 +143,12 @@ export default function DashboardView({
             <span className="p-2 bg-surface-container-low rounded-lg text-primary">
               <Calendar className="w-5 h-5 text-primary" />
             </span>
-            <span className="text-xs font-bold text-secondary bg-secondary-container/50 px-2 py-0.5 rounded">
-              +2 from yesterday
-            </span>
           </div>
           <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
             Today's Bookings
           </p>
           <h3 className="text-4xl font-extrabold text-on-surface mt-1.5 font-headline">
-            {bookings.length}
+            {todayBookings.length}
           </h3>
         </div>
 
@@ -144,9 +158,7 @@ export default function DashboardView({
             <span className="p-2 bg-surface-container-low rounded-lg text-primary">
               <span className="font-black text-primary text-base">₱</span>
             </span>
-            <span className="text-xs font-bold text-secondary bg-secondary-container/50 px-2 py-0.5 rounded flex items-center gap-1">
-              <TrendingUp className="w-3 h-3 text-secondary" /> +8%
-            </span>
+            <TrendingUp className="w-4 h-4 text-secondary" />
           </div>
           <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
             Revenue This Month
@@ -161,9 +173,6 @@ export default function DashboardView({
           <div className="flex justify-between items-start mb-4">
             <span className="p-2 bg-surface-container-low rounded-lg text-primary">
               <PieChart className="w-5 h-5 text-primary" />
-            </span>
-            <span className="text-xs font-medium text-on-surface-variant bg-surface-container px-2 py-0.5 rounded">
-              Peak: 92%
             </span>
           </div>
           <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
@@ -251,46 +260,23 @@ export default function DashboardView({
           <div>
             <h4 className="font-semibold text-lg text-on-surface mb-6">Occupancy by Court</h4>
             <div className="space-y-6 mt-4">
-              {/* Court 1 */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span>Court 1 (Indoor)</span>
-                  <span className="text-primary font-bold">88%</span>
+              {courtOccupancy.length === 0 && (
+                <p className="text-xs text-on-surface-variant">No courts data.</p>
+              )}
+              {courtOccupancy.map(c => (
+                <div key={c.id} className="space-y-2">
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span>{c.name}</span>
+                    <span className="text-primary font-bold">{c.pct}%</span>
+                  </div>
+                  <div className="h-2 w-full bg-surface-container-low overflow-hidden rounded">
+                    <div className="h-full bg-primary rounded" style={{ width: `${c.pct}%` }}></div>
+                  </div>
                 </div>
-                <div className="h-2 w-full bg-surface-container-low overflow-hidden rounded">
-                  <div className="h-full bg-primary rounded" style={{ width: '88%' }}></div>
-                </div>
-              </div>
-
-              {/* Court 2 */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span>Court 2 (Indoor)</span>
-                  <span className="text-primary font-bold">72%</span>
-                </div>
-                <div className="h-2 w-full bg-surface-container-low overflow-hidden rounded">
-                  <div className="h-full bg-primary rounded" style={{ width: '72%' }}></div>
-                </div>
-              </div>
-
-              {/* Court 3 */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span>Court 3 (Outdoor)</span>
-                  <span className="text-primary font-bold">64%</span>
-                </div>
-                <div className="h-2 w-full bg-surface-container-low overflow-hidden rounded">
-                  <div className="h-full bg-primary rounded" style={{ width: '64%' }}></div>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
-          <div className="pt-8 text-center border-t border-outline-variant/30 mt-6 md:mt-0">
-            <span className="inline-flex items-center gap-1.5 text-xs text-on-surface-variant font-medium bg-surface-container-low px-3 py-1.5 rounded-full">
-              Average turnaround: <strong className="text-on-surface">12m</strong>
-            </span>
-          </div>
         </div>
       </div>
 

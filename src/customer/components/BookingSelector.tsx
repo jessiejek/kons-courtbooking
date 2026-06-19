@@ -133,7 +133,6 @@ export default function BookingSelector({
   onFinalPriceChange,
   onCourtDbIdChange,
 }: BookingSelectorProps) {
-  const [activePeriodFilter, setActivePeriodFilter] = useState<'All' | 'Night' | 'Morning' | 'Afternoon' | 'Evening'>('All');
   const [pricingRanges, setPricingRanges] = useState<PricingRange[]>([]);
   const [courtMeta, setCourtMeta] = useState<Record<string, CourtMeta>>({});
   const [activeSlugs, setActiveSlugs] = useState<string[]>([]);
@@ -315,10 +314,7 @@ export default function BookingSelector({
     return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const filteredSlots = TIME_SLOTS_RAW.filter(slot => {
-    if (activePeriodFilter === 'All') return true;
-    return slot.period === activePeriodFilter;
-  });
+  const filteredSlots = TIME_SLOTS_RAW;
 
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
@@ -555,27 +551,6 @@ export default function BookingSelector({
               <h2 className="text-xl font-sans font-extrabold text-[#05140B] mb-4">
                 Available playing schedules on <span className="text-[#00694c]">{new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
               </h2>
-
-              {/* Interval period selector tabs */}
-              <div className="flex gap-1.5 border-b border-slate-200/80 pb-3 mb-4 overflow-x-auto">
-                {(['All', 'Night', 'Morning', 'Afternoon', 'Evening'] as const).map((period) => (
-                  <button
-                    key={period}
-                    onClick={() => setActivePeriodFilter(period)}
-                    className={`px-4 py-1.5 rounded-lg text-xs font-mono font-bold uppercase transition-all cursor-pointer shrink-0 ${
-                      activePeriodFilter === period
-                        ? 'bg-[#00694c] text-white'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                    }`}
-                  >
-                    {period === 'All' && 'All'}
-                    {period === 'Night' && 'Night (12AM–6AM)'}
-                    {period === 'Morning' && 'Morning (6AM–12PM)'}
-                    {period === 'Afternoon' && 'Afternoon (12PM–6PM)'}
-                    {period === 'Evening' && 'Evening (6PM–12MN)'}
-                  </button>
-                ))}
-              </div>
 
               {/* Time grid table */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
