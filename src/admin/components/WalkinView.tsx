@@ -20,10 +20,9 @@ interface SlotBooking {
   is_walkin?: boolean;
 }
 
-const HOURS = Array.from({ length: 18 }, (_, i) => {
-  const h = i + 6;
-  return `${h.toString().padStart(2, '0')}:00`;
-});
+const HOURS = Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}:00`);
+const HOURS_AM = HOURS.slice(0, 12); // 00:00–11:00
+const HOURS_PM = HOURS.slice(12);    // 12:00–23:00
 
 function fmtHour(t: string) {
   const h = parseInt(t.split(':')[0]);
@@ -333,10 +332,11 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                   </div>
                 </div>
 
-                {/* Hour grid — bigger cells */}
-                <div className="px-5 py-4 overflow-x-auto">
-                  <div className="flex gap-2 min-w-max">
-                    {HOURS.map(hour => {
+                {/* Hour grid — 2 rows of 12, no scroll */}
+                <div className="px-3 py-3 space-y-1.5">
+                  {[HOURS_AM, HOURS_PM].map((row, rowIdx) => (
+                  <div key={rowIdx} className="grid grid-cols-12 gap-1">
+                    {row.map(hour => {
                       const booking = isHourBooked(bookings, hour);
                       const isCurrentHour = toH(hour) === nowH && viewDate === today;
                       const past = isPastHour(hour);
@@ -389,26 +389,19 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                           key={hour}
                           onClick={() => handleSlotClick(court.id, hour, !!booking)}
                           title={booking ? `${booking.customer_name} · ${fmtTime(booking.start_time)}–${fmtTime(booking.end_time)}` : selectable ? `Click to select ${fmtHour(hour)}` : ''}
-                          className={`flex flex-col items-center justify-center rounded-xl text-center w-[72px] py-3.5 px-1 border-2 transition-all duration-100 select-none ${cellClass}`}
+                          className={`flex flex-col items-center justify-center rounded-lg text-center py-2 px-0.5 border-2 transition-all duration-100 select-none ${cellClass}`}
                         >
-                          <span className={`text-[12px] font-bold block leading-tight ${hourLabelClass}`}>
+                          <span className={`text-[10px] font-bold block leading-tight ${hourLabelClass}`}>
                             {fmtHour(hour)}
                           </span>
-                          <span className={`text-[9px] block leading-tight ${isSelected ? 'text-white/60' : isCurrentHour && !booking ? 'text-amber-500/70' : 'text-on-surface-variant/40'}`}>
-                            ({fmtHour(hour)}–{fmtHour(`${(toH(hour)+1).toString().padStart(2,'0')}:00`)})
+                          <span className={`mt-0.5 block truncate w-full text-center leading-tight ${subClass}`}>
+                            {booking ? booking.customer_name.split(' ')[0] : isSelected ? '✓' : subText}
                           </span>
-                          <span className={`mt-0.5 block truncate max-w-[64px] leading-tight ${subClass}`}>
-                            {booking ? booking.customer_name.split(' ')[0] : isSelected ? 'selected' : subText}
-                          </span>
-                          {booking && (
-                            <span className={`text-[9px] mt-0.5 capitalize ${isWalkin ? 'text-amber-500' : 'text-[#00694c]/70'}`}>
-                              {isWalkin ? 'walk-in' : booking.payment_method}
-                            </span>
-                          )}
                         </div>
                       );
                     })}
                   </div>
+                  ))}
                 </div>
 
                 {/* Selection action bar */}
