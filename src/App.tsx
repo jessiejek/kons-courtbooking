@@ -4,6 +4,7 @@ import CustomerApp from './customer/CustomerApp';
 import AdminApp from './admin/AdminApp';
 import { supabase, isSupabaseEnabled } from './lib/supabase';
 import { useFCM } from './hooks/useFCM';
+import NotificationBanner from './components/NotificationBanner';
 
 export interface CurrentUser {
   name: string;
@@ -53,7 +54,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [authReady, setAuthReady] = useState(!isSupabaseEnabled);
 
-  useFCM(currentUser?.email, role);
+  const { requestPushPermission } = useFCM(currentUser?.email, role);
 
   const applySession = (session: any) => {
     if (session?.user) {
@@ -98,6 +99,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AppRoutes role={role} onLogin={setRole} onLogout={handleLogout} currentUser={currentUser} />
+      {currentUser && <NotificationBanner onEnable={requestPushPermission} />}
     </BrowserRouter>
   );
 }
