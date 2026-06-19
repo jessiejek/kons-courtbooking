@@ -5,7 +5,6 @@ import {
   CreditCard,
   Calendar,
   UserPlus,
-  Plus,
   LogOut
 } from 'lucide-react';
 
@@ -83,17 +82,6 @@ export default function Sidebar({ onNewBookingClick, newBookingCount = 0, onClea
       {/* Footer Nav & Profile */}
       <div className="mt-auto space-y-1.5 pt-4 border-t border-outline-variant">
         {/* Settings and Support hidden — not yet implemented */}
-
-        {/* Quick Booking CTA */}
-        <div className="mt-3 px-1">
-          <button
-            onClick={onNewBookingClick}
-            className="w-full bg-primary text-on-primary font-semibold text-sm py-2.5 px-4 rounded-lg hover:bg-opacity-95 active:scale-[0.98] transition-all shadow-sm flex items-center justify-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Book Now</span>
-          </button>
-        </div>
 
         {/* Club Manager Profile Section */}
         <div className="mt-3 border-t border-outline-variant/60 pt-3 space-y-1">

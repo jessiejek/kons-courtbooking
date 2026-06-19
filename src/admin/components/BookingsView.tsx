@@ -118,13 +118,14 @@ export default function BookingsView({
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
-          <button
+          {/* New Reservation removed — use Walk-in tab instead */}
+          {false && <button
             onClick={onAddNewBooking}
             className="bg-primary text-on-primary font-semibold text-xs py-2.5 px-5 rounded-lg hover:bg-opacity-95 active:scale-[0.98] transition-all flex items-center gap-2 uppercase tracking-wider"
           >
             <Plus className="w-4 h-4" />
             <span>New Reservation</span>
-          </button>
+          </button>}
         </div>
       </div>
 
