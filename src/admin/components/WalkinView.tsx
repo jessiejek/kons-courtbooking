@@ -133,9 +133,8 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
     setNbCourtId(courtId);
     if (sel.length > 0) {
       const startH = toH(sel[0]);
-      // last selected cell IS the end time (1PM–4PM highlighted = booking until 4PM)
-      const lastH = toH(sel[sel.length - 1]);
-      const endH = lastH === startH ? startH + 1 : lastH;
+      // each slot = 1 hour block, so end = last slot + 1 (2 slots selected = 2 hours)
+      const endH = toH(sel[sel.length - 1]) + 1;
       const durationH = endH - startH;
       setNbStart(`${startH.toString().padStart(2, '0')}:00`);
       setNbEnd(`${endH.toString().padStart(2, '0')}:00`);
@@ -358,8 +357,7 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                 {hasSelection && !isMaintenance && (() => {
                   const sorted = sel.sort();
                   const startH = toH(sorted[0]);
-                  const lastH = toH(sorted[sorted.length - 1]);
-                  const endH = lastH === startH ? startH + 1 : lastH;
+                  const endH = toH(sorted[sorted.length - 1]) + 1;
                   const durationH = endH - startH;
                   const startStr = `${startH.toString().padStart(2, '0')}:00`;
                   const endStr = `${endH.toString().padStart(2, '0')}:00`;
