@@ -93,21 +93,26 @@ export default function CheckoutPage({
     : selectedCourt;
   const effectiveDate = isDemo ? new Date().toISOString().split('T')[0] : selectedDate;
 
-  // Pre-fill guest details from logged-in user + saved phone from profile
+  // Pre-fill guest details from logged-in user + saved phone from profile or last booking
   useEffect(() => {
     if (!currentUser) return;
     setFullName(currentUser.name);
     setEmail(currentUser.email);
     setIsSocialLoggedIn(true);
-    // Load saved phone from profiles table
-    if (isSupabaseEnabled && supabase) {
-      supabase.auth.getUser().then(({ data: { user } }) => {
-        if (!user) return;
-        supabase!.from('profiles').select('phone').eq('id', user.id).single().then(({ data }) => {
-          if (data?.phone) setPhoneNumber(data.phone);
-        });
-      });
-    }
+    if (!isSupabaseEnabled || !supabase) return;
+    const loadPhone = async () => {
+      // Try profiles table first
+      const { data: profile } = await supabase!
+        .from('profiles').select('phone').eq('id', (await supabase!.auth.getUser()).data.user?.id ?? '').single();
+      if (profile?.phone) { setPhoneNumber(profile.phone); return; }
+      // Fallback: most recent booking by this email
+      const { data: lastBooking } = await supabase!
+        .from('bookings').select('customer_phone')
+        .eq('customer_email', currentUser.email)
+        .order('created_at', { ascending: false }).limit(1).single();
+      if (lastBooking?.customer_phone) setPhoneNumber(lastBooking.customer_phone);
+    };
+    loadPhone();
   }, [currentUser]);
 
   const handleSocialLogin = async (platform: 'Google' | 'Facebook') => {
@@ -273,10 +278,10 @@ export default function CheckoutPage({
 
     await releaseHolds();
 
-    // Save phone number to profile for next time
+    // Save phone number to profile for next time (update only — INSERT policy not needed)
     if (isSupabaseEnabled && supabase && phoneNumber.trim()) {
       supabase.auth.getUser().then(({ data: { user } }) => {
-        if (user) supabase!.from('profiles').upsert({ id: user.id, phone: phoneNumber.trim() }, { onConflict: 'id' });
+        if (user) supabase!.from('profiles').update({ phone: phoneNumber.trim() }).eq('id', user.id);
       });
     }
 
