@@ -107,10 +107,4 @@ export const TIME_SLOTS_RAW = [
   { time: '21:00', label: '09:00 PM', period: 'Evening' as const },
   { time: '22:00', label: '10:00 PM', period: 'Evening' as const },
   { time: '23:00', label: '11:00 PM', period: 'Evening' as const },
-  { time: '00:00', label: '12:00 AM', period: 'Night' as const },
-  { time: '01:00', label: '01:00 AM', period: 'Night' as const },
-  { time: '02:00', label: '02:00 AM', period: 'Night' as const },
-  { time: '03:00', label: '03:00 AM', period: 'Night' as const },
-  { time: '04:00', label: '04:00 AM', period: 'Night' as const },
-  { time: '05:00', label: '05:00 AM', period: 'Night' as const },
 ];

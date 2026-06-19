@@ -133,7 +133,7 @@ export default function BookingSelector({
   onFinalPriceChange,
   onCourtDbIdChange,
 }: BookingSelectorProps) {
-  const [activePeriodFilter, setActivePeriodFilter] = useState<'All' | 'Morning' | 'Afternoon' | 'Evening' | 'Night'>('All');
+  const [activePeriodFilter, setActivePeriodFilter] = useState<'All' | 'Morning' | 'Afternoon' | 'Evening'>('All');
   const [pricingRanges, setPricingRanges] = useState<PricingRange[]>([]);
   const [courtMeta, setCourtMeta] = useState<Record<string, CourtMeta>>({});
   const [activeSlugs, setActiveSlugs] = useState<string[]>([]);
@@ -325,8 +325,6 @@ export default function BookingSelector({
   const isPastSlot = (time: string) => {
     if (selectedDate !== todayStr) return false;
     const slotH = parseInt(time.split(':')[0]);
-    // Overnight slots (12AM–5AM) are next-day morning — never past
-    if (slotH < 6) return false;
     return slotH <= now.getHours();
   };
 
@@ -559,7 +557,7 @@ export default function BookingSelector({
 
               {/* Interval period selector tabs */}
               <div className="flex gap-1.5 border-b border-slate-200/80 pb-3 mb-4 overflow-x-auto">
-                {(['All', 'Morning', 'Afternoon', 'Evening', 'Night'] as const).map((period) => (
+                {(['All', 'Morning', 'Afternoon', 'Evening'] as const).map((period) => (
                   <button
                     key={period}
                     onClick={() => setActivePeriodFilter(period)}
@@ -573,7 +571,6 @@ export default function BookingSelector({
                     {period === 'Morning' && 'Morning (6AM–12PM)'}
                     {period === 'Afternoon' && 'Afternoon (12PM–6PM)'}
                     {period === 'Evening' && 'Evening (6PM–12MN)'}
-                    {period === 'Night' && 'Night (12AM–6AM)'}
                   </button>
                 ))}
               </div>
