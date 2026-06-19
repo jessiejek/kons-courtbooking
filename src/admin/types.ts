@@ -27,7 +27,8 @@ export interface Booking {
   id: number;
   bookingId: string; // e.g. "BK-1025"
   date: string;       // e.g. "Oct 24, 2023"
-  time: string;       // e.g. "08:00 AM"
+  time: string;       // start time e.g. "08:00"
+  endTime: string;    // end time e.g. "10:00"
   courtId: number;
   courtName: string;
   customerName: string;

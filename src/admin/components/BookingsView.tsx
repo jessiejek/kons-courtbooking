@@ -221,8 +221,8 @@ export default function BookingsView({
                     <td className="px-6 py-4 font-medium text-on-surface whitespace-nowrap">
                       {booking.date}
                     </td>
-                    <td className="px-6 py-4 text-on-surface-variant text-xs whitespace-nowrap">
-                      {booking.time}
+                    <td className="px-6 py-4 text-on-surface-variant text-xs whitespace-nowrap font-mono">
+                      {booking.time} – {booking.endTime}
                     </td>
                     <td className="px-6 py-4 text-on-surface-variant font-medium whitespace-nowrap">
                       {booking.courtName}

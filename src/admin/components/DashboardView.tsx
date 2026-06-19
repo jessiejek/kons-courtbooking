@@ -312,7 +312,7 @@ export default function DashboardView({
           <table className="w-full text-left">
             <thead className="bg-surface-container-low/40 text-[10px] text-outline uppercase tracking-wider font-bold">
               <tr>
-                <th className="px-6 py-3.5 font-bold">Time</th>
+                <th className="px-6 py-3.5 font-bold">Time (Start – End)</th>
                 <th className="px-6 py-3.5 font-bold">Court</th>
                 <th className="px-6 py-3.5 font-bold">Customer</th>
                 <th className="px-6 py-3.5 font-bold">Status</th>
@@ -327,8 +327,8 @@ export default function DashboardView({
                     onClick={() => onOpenBookingDetails(booking.bookingId)}
                     className="hover:bg-surface-container-lowest transition-all cursor-pointer group"
                   >
-                    <td className="px-6 py-4 text-xs font-semibold text-on-surface">
-                      {booking.time}
+                    <td className="px-6 py-4 text-xs font-semibold text-on-surface font-mono">
+                      {booking.time} – {booking.endTime}
                     </td>
                     <td className="px-6 py-4">
                       <span className="px-2 py-0.5 bg-surface-container text-on-surface-variant font-bold text-[9px] tracking-wide rounded">

@@ -79,6 +79,7 @@ const mapRow = (row: any): Booking => ({
   bookingId: row.booking_ref,
   date: row.booking_date,
   time: row.start_time?.slice(0, 5) ?? '',
+  endTime: row.end_time?.slice(0, 5) ?? '',
   courtId: row.court_id ?? 1,
   courtName: row.court_name ?? '',
   customerName: row.customer_name ?? '',
@@ -397,7 +398,7 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
                 </div>
                 <div className="mt-2">
                   <p className="text-xs text-outline uppercase tracking-wider font-semibold">Reserved Slot</p>
-                  <p className="font-semibold text-on-surface mt-0.5 font-mono">{activeDetailBooking.time}</p>
+                  <p className="font-semibold text-on-surface mt-0.5 font-mono">{activeDetailBooking.time} – {activeDetailBooking.endTime}</p>
                 </div>
                 <div className="mt-2">
                   <p className="text-xs text-outline uppercase tracking-wider font-semibold">Facility Court</p>
