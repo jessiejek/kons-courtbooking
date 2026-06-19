@@ -276,8 +276,7 @@ export default function BookingSelector({
   // Compute price per slot (time-based) and total
   const totalHours = selectedSlots.length;
   const courtFee = selectedSlots.reduce((sum, time) => sum + getSlotRate(time), 0);
-  const discount = totalHours > 2 ? 50 : 0;
-  const finalPrice = Math.max(0, courtFee - discount);
+  const finalPrice = courtFee;
 
   // Keep parent in sync
   useEffect(() => { onFinalPriceChange?.(finalPrice); }, [finalPrice]);
@@ -559,6 +558,7 @@ export default function BookingSelector({
                   const slotStatus = getSlotStatus(slot.time);
                   const isPending = slotStatus === 'pending';
                   const isPast = isPastSlot(slot.time);
+                  const isNow = selectedDate === todayStr && parseInt(slot.time) === now.getHours();
                   const isSlotCurrentlySelected = selectedSlots.includes(slot.time);
                   const selectable = !slotBooked && !isPast && isSlotSelectable(slot.time);
                   const nonContiguous = !slotBooked && !isPast && !selectable;
@@ -578,16 +578,19 @@ export default function BookingSelector({
                             : 'bg-zinc-100 border-zinc-200 text-slate-400 cursor-not-allowed opacity-60'
                           : isSlotCurrentlySelected
                             ? 'bg-[#00694c] border-[#00694c] text-white font-bold shadow-md ring-2 ring-[#00694c]/10'
-                            : nonContiguous
-                              ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed opacity-40'
-                              : 'bg-white hover:border-[#00694c] border-slate-200 text-slate-800 cursor-pointer'
+                            : isNow
+                              ? 'bg-yellow-50 border-yellow-400 text-slate-800 cursor-pointer ring-1 ring-yellow-300'
+                              : nonContiguous
+                                ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed opacity-40'
+                                : 'bg-white hover:border-[#00694c] border-slate-200 text-slate-800 cursor-pointer'
                       }`}
                     >
                       <div>
                         <div className="text-[11px] font-mono leading-none tracking-tight">
                           {slot.label}
+                          {isNow && !isPast && <span className="ml-1 text-yellow-600 text-[8px] font-bold">NOW</span>}
                         </div>
-                        <div className={`text-[9px] font-mono mt-1 leading-none ${isPast ? 'text-slate-300' : isPending ? 'text-amber-600' : 'text-slate-400'}`}>
+                        <div className={`text-[9px] font-mono mt-1 leading-none ${isPast ? 'text-slate-300' : isPending ? 'text-amber-600' : isNow ? 'text-yellow-600' : 'text-slate-400'}`}>
                           {isPast ? 'Past' : slotBooked ? (isPending ? 'Awaiting approval' : 'Booked') : `₱${getSlotRate(slot.time)}/hr`}
                         </div>
                       </div>
@@ -605,6 +608,10 @@ export default function BookingSelector({
                       ) : isSlotCurrentlySelected ? (
                         <span className="text-[9px] font-mono bg-[#00694c] text-white px-1.5 py-0.5 rounded font-black uppercase">
                           Added
+                        </span>
+                      ) : isNow ? (
+                        <span className="text-[9px] font-mono bg-yellow-400 text-yellow-900 px-1.5 py-0.5 rounded font-black uppercase">
+                          Now
                         </span>
                       ) : (
                         <span className="text-[9px] font-mono bg-slate-900/5 hover:bg-slate-900/10 text-slate-700 px-1.5 py-0.5 rounded font-semibold uppercase">
@@ -711,18 +718,6 @@ export default function BookingSelector({
                   {selectedSlots.map(t => `${t} = ₱${getSlotRate(t)}`).join(' · ')}
                 </div>
               )}
-              <div className="flex justify-between">
-                <span>Rental Gear Allowance</span>
-                <span className="text-emerald-600 font-semibold uppercase font-mono">Free</span>
-              </div>
-              
-              {discount > 0 && (
-                <div className="flex justify-between text-emerald-600">
-                  <span>Loyalty Discount (2+ hrs)</span>
-                  <span className="font-mono font-semibold">-₱{discount}</span>
-                </div>
-              )}
-
               <div className="flex justify-between text-slate-900 pt-2 border-t border-slate-100 text-sm font-bold">
                 <span>Subtotal Price</span>
                 <span className="font-sans text-lg font-black text-slate-900 font-mono">₱{finalPrice}</span>
