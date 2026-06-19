@@ -196,21 +196,12 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
           <h2 className="text-2xl font-extrabold text-on-surface tracking-tight">Walk-in counter</h2>
           <p className="text-sm text-on-surface-variant mt-0.5">Click open slots to select a time range, then press <strong>+ Add walk-in</strong>.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <input
-            type="date"
-            value={viewDate}
-            onChange={e => setViewDate(e.target.value)}
-            className="border border-outline-variant rounded-lg px-3 py-2 text-sm font-medium bg-surface focus:border-primary focus:ring-0"
-          />
-          <button
-            onClick={() => openFormForCourt(courts.find(c => c.status === 'active')?.id ?? courts[0]?.id)}
-            className="flex items-center gap-2 bg-primary text-white font-bold text-sm px-5 py-2.5 rounded-lg hover:opacity-90 transition-all shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            New walk-in
-          </button>
-        </div>
+        <input
+          type="date"
+          value={viewDate}
+          onChange={e => setViewDate(e.target.value)}
+          className="border border-outline-variant rounded-lg px-3 py-2 text-sm font-medium bg-surface focus:border-primary focus:ring-0"
+        />
       </div>
 
       {/* Stat cards */}
@@ -276,22 +267,13 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                         {isOccupiedNow ? '● occupied now' : 'open now'}
                       </span>
                     )}
-                    {hasSelection && (
-                      <span className="text-[11px] text-primary font-bold">
-                        {sel.length}h · {fmtHour(sel.sort()[0])} – {fmtHour(`${(toH(sel.sort()[sel.length - 1]) + 1).toString().padStart(2, '0')}:00`)}
-                      </span>
-                    )}
-                    {!isMaintenance && (
+                    {!isMaintenance && !hasSelection && (
                       <button
                         onClick={() => openFormForCourt(court.id)}
-                        className={`flex items-center gap-1.5 text-[12px] font-bold px-4 py-2 rounded-lg border transition-all ${
-                          hasSelection
-                            ? 'bg-primary text-white border-primary shadow-md scale-[1.03]'
-                            : 'text-primary border-primary/30 hover:bg-primary/5'
-                        }`}
+                        className="flex items-center gap-1.5 text-[12px] font-bold px-4 py-2 rounded-lg border text-primary border-primary/30 hover:bg-primary/5 transition-all"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        Add walk-in{hasSelection ? ` (${sel.length}h)` : ''}
+                        Add walk-in
                       </button>
                     )}
                   </div>
@@ -342,18 +324,22 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                         subClass = 'text-on-surface-variant/60 text-[10px]';
                       }
 
+                      const nextHour = `${(toH(hour) + 1).toString().padStart(2, '0')}:00`;
                       return (
                         <div
                           key={hour}
                           onClick={() => handleSlotClick(court.id, hour, !!booking)}
-                          title={booking ? `${booking.customer_name} · ${fmtTime(booking.start_time)}–${fmtTime(booking.end_time)}` : selectable ? 'Click to select' : ''}
-                          className={`flex flex-col items-center justify-center rounded-xl text-center w-[72px] py-3.5 px-1 border-2 transition-all duration-100 select-none ${cellClass}`}
+                          title={booking ? `${booking.customer_name} · ${fmtTime(booking.start_time)}–${fmtTime(booking.end_time)}` : selectable ? `Select ${fmtHour(hour)}–${fmtHour(nextHour)}` : ''}
+                          className={`flex flex-col items-center justify-center rounded-xl text-center w-[76px] py-3 px-1 border-2 transition-all duration-100 select-none ${cellClass}`}
                         >
-                          <span className={`text-[12px] block leading-tight ${hourLabelClass}`}>
+                          <span className={`text-[11px] font-bold block leading-tight ${hourLabelClass}`}>
                             {fmtHour(hour)}
                           </span>
-                          <span className={`mt-1 block truncate max-w-[64px] leading-tight ${subClass}`}>
-                            {subText}
+                          <span className={`text-[10px] block leading-tight ${isSelected ? 'text-white/70' : 'text-on-surface-variant/50'}`}>
+                            –{fmtHour(nextHour)}
+                          </span>
+                          <span className={`mt-0.5 block truncate max-w-[68px] leading-tight ${subClass}`}>
+                            {booking ? booking.customer_name.split(' ')[0] : isSelected ? 'selected' : isCurrentHour && !booking ? 'now·open' : !booking ? 'open' : ''}
                           </span>
                           {booking && (
                             <span className={`text-[9px] mt-0.5 capitalize ${isWalkin ? 'text-amber-500' : 'text-[#00694c]/70'}`}>
@@ -373,7 +359,7 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                       <span className="text-sm text-primary font-bold">
                         {sel.length} hour{sel.length !== 1 ? 's' : ''} selected
                       </span>
-                      <span className="text-sm text-primary/70 ml-2">
+                      <span className="text-sm text-primary/70 ml-2 font-mono">
                         {fmtTime(sel.sort()[0])} – {fmtTime(`${(toH(sel.sort()[sel.length - 1]) + 1).toString().padStart(2, '0')}:00`)}
                       </span>
                     </div>
@@ -386,9 +372,10 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                       </button>
                       <button
                         onClick={() => openFormForCourt(court.id)}
-                        className="bg-primary text-white text-xs font-bold px-5 py-2 rounded-lg shadow hover:opacity-90 transition-all"
+                        className="flex items-center gap-1.5 bg-primary text-white text-sm font-bold px-5 py-2.5 rounded-lg shadow-md hover:opacity-90 transition-all"
                       >
-                        Add walk-in →
+                        <Plus className="w-4 h-4" />
+                        Add walk-in ({sel.length}h)
                       </button>
                     </div>
                   </div>
