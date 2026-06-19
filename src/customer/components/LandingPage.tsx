@@ -118,9 +118,10 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
           </nav>
 
           {/* CTA cluster */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {/* Desktop: full user info */}
             {role ? (
-              <div className="flex items-center gap-2.5">
+              <div className="hidden md:flex items-center gap-2.5">
                 {currentUser?.avatar
                   ? <img src={currentUser.avatar} referrerPolicy="no-referrer" className="w-8 h-8 rounded-full border-2 border-[#00694c]/30 object-cover" />
                   : <div className="w-8 h-8 rounded-full bg-[#00694c] flex items-center justify-center text-white text-xs font-bold">{currentUser?.name?.[0]?.toUpperCase() ?? 'U'}</div>
@@ -133,7 +134,7 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
             ) : (
               <button
                 onClick={onOpenLogin}
-                className={`text-[11px] font-semibold uppercase tracking-wider px-4 py-2 rounded-lg border transition-all ${
+                className={`hidden md:block text-[11px] font-semibold uppercase tracking-wider px-4 py-2 rounded-lg border transition-all ${
                   scrolled
                     ? 'border-[#bccac1] text-[#3d4943] hover:border-[#00694c] hover:text-[#00694c]'
                     : 'border-white/40 text-white hover:bg-white/10'
@@ -142,12 +143,15 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
                 Log in
               </button>
             )}
+
             <button
               onClick={() => onNavigate('booking')}
-              className="bg-[#00694c] hover:bg-[#005a40] text-white text-[11px] font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-md transition-all active:scale-95"
+              className="bg-[#00694c] hover:bg-[#005a40] text-white text-[11px] font-bold uppercase tracking-wider px-4 py-2.5 rounded-xl shadow-md transition-all active:scale-95"
             >
               Book a Court
             </button>
+
+            {/* Mobile only: hamburger (includes login/signout inside dropdown) */}
             <button
               className={`md:hidden p-1.5 rounded-lg transition-colors ${scrolled ? 'text-[#1a1c1b] hover:bg-[#f0f0ee]' : 'text-white hover:bg-white/10'}`}
               onClick={() => setMobileMenuOpen(v => !v)}
