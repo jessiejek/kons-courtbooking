@@ -50,7 +50,7 @@ export default function CheckoutPage({
   const [bookingError, setBookingError] = useState<string | null>(null);
 
   // QR image URL — replace with your actual QR image path or URL
-  const QR_IMAGE_URL = '/qr-payment.png';
+  const QR_IMAGE_URL = '/qr.jpg';
 
   // Hold slots in DB for 10 mins — release on unmount or payment
   const releaseHolds = async () => {
