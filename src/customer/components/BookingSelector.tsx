@@ -325,6 +325,8 @@ export default function BookingSelector({
   const isPastSlot = (time: string) => {
     if (selectedDate !== todayStr) return false;
     const slotH = parseInt(time.split(':')[0]);
+    // Overnight slots (12AM–5AM) are next-day morning — never past
+    if (slotH < 6) return false;
     return slotH <= now.getHours();
   };
 
