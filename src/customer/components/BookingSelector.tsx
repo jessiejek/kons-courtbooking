@@ -222,15 +222,34 @@ export default function BookingSelector({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Returns the hour integer from "HH:MM" string
+  const toHour = (t: string) => parseInt(t.split(':')[0]);
+
+  // Determine which slots can be toggled given current selection (must stay contiguous)
+  const isSlotSelectable = (time: string): boolean => {
+    if (selectedSlots.length === 0) return true;
+    const sorted = [...selectedSlots].sort();
+    const minH = toHour(sorted[0]);
+    const maxH = toHour(sorted[sorted.length - 1]);
+    const h = toHour(time);
+    // Can deselect from either end, or extend one step beyond current block
+    return h === minH - 1 || h === maxH + 1 || selectedSlots.includes(time);
+  };
+
   const handleSlotToggle = (time: string, isBooked: boolean) => {
-    if (isBooked) return; // Can't select booked slots
-    
+    if (isBooked) return;
+    if (!isSlotSelectable(time)) return;
+
     if (selectedSlots.includes(time)) {
-      // Remove slot
-      setSelectedSlots(selectedSlots.filter(s => s !== time));
+      const sorted = [...selectedSlots].sort();
+      const minH = toHour(sorted[0]);
+      const maxH = toHour(sorted[sorted.length - 1]);
+      const h = toHour(time);
+      // Only allow deselecting from either end to keep block contiguous
+      if (h === minH || h === maxH) {
+        setSelectedSlots(selectedSlots.filter(s => s !== time));
+      }
     } else {
-      // Add slot. Check adjacent or allow any multi-selection
-      // Normally booking courts is contiguous, let's keep it flexible
       setSelectedSlots([...selectedSlots, time].sort());
     }
   };
@@ -521,22 +540,26 @@ export default function BookingSelector({
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
                 {filteredSlots.map((slot) => {
                   const slotBooked = isSlotBooked(slot.time);
-                  // Keep mock booker name for demo mode; in realtime mode just say "Booked"
                   const mockInfo = isSupabaseEnabled ? null : getBookedStatusForSlot(slot.time, selectedCourtId, selectedDate);
                   const bookerLabel = mockInfo?.bookerName ?? 'Booked';
                   const isSlotCurrentlySelected = selectedSlots.includes(slot.time);
+                  const selectable = !slotBooked && isSlotSelectable(slot.time);
+                  const nonContiguous = !slotBooked && !selectable;
 
                   return (
                     <button
                       key={slot.time}
-                      disabled={slotBooked}
+                      disabled={slotBooked || nonContiguous}
                       onClick={() => handleSlotToggle(slot.time, slotBooked)}
+                      title={nonContiguous ? 'Select consecutive slots only' : undefined}
                       className={`flex items-center justify-between p-3 rounded-lg border transition-all text-left relative overflow-hidden ${
                         slotBooked
                           ? 'bg-zinc-100 border-zinc-200 text-slate-400 cursor-not-allowed opacity-60'
                           : isSlotCurrentlySelected
                             ? 'bg-[#00694c] border-[#00694c] text-white font-bold shadow-md ring-2 ring-[#00694c]/10'
-                            : 'bg-white hover:border-slate-800 border-slate-200 text-slate-800 cursor-pointer'
+                            : nonContiguous
+                              ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed opacity-40'
+                              : 'bg-white hover:border-[#00694c] border-slate-200 text-slate-800 cursor-pointer'
                       }`}
                     >
                       <div>
