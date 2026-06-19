@@ -33,7 +33,7 @@ export default function LoginModal({ isOpen, onClose, onLogin }: Props) {
       setFacebookLoading(true);
       const { error: oauthErr } = await supabase.auth.signInWithOAuth({
         provider: 'facebook',
-        options: { redirectTo: window.location.origin },
+        options: { redirectTo: window.location.href },
       });
       setFacebookLoading(false);
       if (oauthErr) setError(oauthErr.message);
@@ -49,7 +49,7 @@ export default function LoginModal({ isOpen, onClose, onLogin }: Props) {
       setGoogleLoading(true);
       const { error: oauthErr } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: window.location.origin },
+        options: { redirectTo: window.location.href },
       });
       setGoogleLoading(false);
       if (oauthErr) setError(oauthErr.message);
