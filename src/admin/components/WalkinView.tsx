@@ -88,10 +88,6 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
   const [nbPayment, setNbPayment] = useState<'cash' | 'gcash'>('cash');
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadGlobalRates();
-  }, []);
-
   useEffect(() => { loadSchedule(); }, [viewDate]);
 
   const loadGlobalRates = async () => {
@@ -179,7 +175,9 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
     setCourtSelections(prev => ({ ...prev, [courtId]: next }));
   };
 
-  const openFormForCourt = (courtId: number) => {
+  const openFormForCourt = async (courtId: number) => {
+    // Always re-fetch latest pricing before opening the form
+    await loadGlobalRates();
     const sel = getSelectedForCourt(courtId).sort();
     const court = courts.find(c => c.id === courtId) ?? courts[0];
     setNbCourtId(courtId);
@@ -187,7 +185,6 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
       const startH = toH(sel[0]);
       // each slot = 1 hour block, so end = last slot + 1 (2 slots selected = 2 hours)
       const endH = toH(sel[sel.length - 1]) + 1;
-      const durationH = endH - startH;
       setNbStart(`${startH.toString().padStart(2, '0')}:00`);
       setNbEnd(`${endH.toString().padStart(2, '0')}:00`);
       setNbAmount(calcAmount(startH, endH, court.id, courtUseGlobal[court.id] ?? true, allRates, court.defaultPrice ?? 300));

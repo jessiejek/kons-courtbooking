@@ -116,8 +116,12 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
   useEffect(() => {
     loadCourts();
     loadBookings();
-    loadAdminGlobalRates();
   }, []);
+
+  // Re-fetch pricing every time the booking form opens
+  useEffect(() => {
+    if (isNewBookingOpen) loadAdminGlobalRates();
+  }, [isNewBookingOpen]);
 
   // Recalculate amount whenever court, start, or end time changes
   useEffect(() => {
