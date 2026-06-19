@@ -47,7 +47,7 @@ export default function BookingsHistory({
       if (!error && data) {
         const statusMap: Record<string, Booking['status']> = {
           confirmed: 'Upcoming', paid: 'Upcoming',
-          completed: 'Past', cancelled: 'Cancelled', pending: 'Upcoming',
+          completed: 'Past', cancelled: 'Cancelled', pending: 'Pending' as any,
         };
         setSupabaseBookings(
           data.map((row) => {
@@ -262,6 +262,11 @@ export default function BookingsHistory({
                       {booking.status === 'Cancelled' && (
                         <span className="text-[10px] bg-[#BA1A1A] text-white font-mono font-bold uppercase px-2.5 py-1 rounded-full shadow-sm">
                           Cancelled
+                        </span>
+                      )}
+                      {(booking.status as any) === 'Pending' && (
+                        <span className="text-[10px] bg-amber-500 text-white font-mono font-bold uppercase px-2.5 py-1 rounded-full shadow-sm">
+                          ⏳ Pending
                         </span>
                       )}
                     </div>

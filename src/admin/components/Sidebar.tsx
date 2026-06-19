@@ -4,18 +4,20 @@ import {
   CreditCard,
   Calendar,
   UserPlus,
-  LogOut
+  LogOut,
+  Banknote,
 } from 'lucide-react';
 
 interface SidebarProps {
   onNewBookingClick: () => void;
   newBookingCount?: number;
   onClearNewBookingCount?: () => void;
+  pendingPaymentsCount?: number;
   currentUser?: { name: string; email: string; avatar?: string; } | null;
   onLogout?: () => void;
 }
 
-export default function Sidebar({ onNewBookingClick, newBookingCount = 0, onClearNewBookingCount, currentUser, onLogout }: SidebarProps) {
+export default function Sidebar({ onNewBookingClick, newBookingCount = 0, onClearNewBookingCount, pendingPaymentsCount = 0, currentUser, onLogout }: SidebarProps) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
@@ -24,6 +26,7 @@ export default function Sidebar({ onNewBookingClick, newBookingCount = 0, onClea
     { id: 'courts', label: 'Courts & Pricing', icon: CreditCard, path: '/admin/courts', badge: 0 },
     { id: 'bookings', label: 'Bookings', icon: Calendar, path: '/admin/bookings', badge: newBookingCount },
     { id: 'walkin', label: 'Walk-in', icon: UserPlus, path: '/admin/walkin', badge: 0 },
+    { id: 'payments', label: 'Payments', icon: Banknote, path: '/admin/payments', badge: pendingPaymentsCount },
   ] as const;
 
   const isActive = (path: string) => {

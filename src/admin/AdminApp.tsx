@@ -15,6 +15,7 @@ import AddEditCourtView from './components/AddEditCourtView';
 import { useToast, ToastContainer } from '../components/Toast';
 import ConfirmModal, { ConfirmOptions } from '../components/ConfirmModal';
 import WalkinView from './components/WalkinView';
+import PaymentsView from './components/PaymentsView';
 
 interface Props {
   role: 'user' | 'admin' | null;
@@ -87,6 +88,7 @@ const mapRow = (row: any): Booking => ({
   phone: row.customer_phone ?? '',
   status: row.booking_status,
   amount: Number(row.total_amount ?? 0),
+  paymentStatus: row.payment_status ?? '',
 });
 
 export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props) {
@@ -307,6 +309,8 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
     });
   };
 
+  const pendingPaymentsCount = bookings.filter(b => (b as any).paymentStatus === 'pending_verification').length;
+
   // ── Realtime: new bookings arrive live ──────────────────
   const [newBookingCount, setNewBookingCount] = useState(0);
 
@@ -340,6 +344,7 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
         onNewBookingClick={() => setIsNewBookingOpen(true)}
         newBookingCount={newBookingCount}
         onClearNewBookingCount={() => setNewBookingCount(0)}
+        pendingPaymentsCount={pendingPaymentsCount}
         currentUser={currentUser}
         onLogout={() => setConfirmOpts({
           title: 'Sign Out',
@@ -403,6 +408,13 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
                 courts={courts}
                 onWalkinCreated={loadBookings}
                 toast={toast}
+              />
+            } />
+
+            <Route path="/payments" element={
+              <PaymentsView
+                toast={toast}
+                onPaymentActioned={loadBookings}
               />
             } />
 

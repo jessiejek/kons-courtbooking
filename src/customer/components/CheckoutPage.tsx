@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ShieldCheck, Mail, Phone, User, CreditCard, Lock, ArrowRight, AlertTriangle, Smartphone, Landmark, Check } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ChevronLeft, Mail, Phone, User, Lock, ArrowRight, AlertTriangle, Check, Upload, X, ImageIcon } from 'lucide-react';
 import { Court, Booking } from '../types';
 import { supabase, isSupabaseEnabled } from '../../lib/supabase';
 
@@ -40,25 +40,17 @@ export default function CheckoutPage({
   const [email, setEmail] = useState('');
   const [isSocialLoggedIn, setIsSocialLoggedIn] = useState(false);
 
-  // Payment Selection
-  const [paymentMethod, setPaymentMethod] = useState<'Card' | 'GCash' | 'Online Banking'>('Card');
-
-  // Card Inputs
-  const [cardName, setCardName] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCVV, setCardCVV] = useState('');
-
-  // GCash Inputs
-  const [gcashNumber, setGcashNumber] = useState('');
-  const [gcashStep, setGcashStep] = useState<'number' | 'otp' | 'success'>('number');
-  const [gcashOtp, setGcashOtp] = useState('');
-
-  // Online Banking Inputs
-  const [selectedBank, setSelectedBank] = useState('BDO');
+  // Payment proof
+  const [paymentReference, setPaymentReference] = useState('');
+  const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
+
+  // QR image URL — replace with your actual QR image path or URL
+  const QR_IMAGE_URL = '/qr-payment.png';
 
   // Hold slots in DB for 10 mins — release on unmount or payment
   const releaseHolds = async () => {
@@ -73,7 +65,7 @@ export default function CheckoutPage({
       slot_date: selectedDate,
       slot_time: slotTime,
       session_id: holdSessionId,
-      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     }));
     // Upsert — replace existing holds for this session
     supabase.from('slot_holds').upsert(holdRows, { onConflict: 'session_id,court_id,slot_date,slot_time' });
@@ -119,32 +111,20 @@ export default function CheckoutPage({
     setPhoneNumber('+63 912 345 6789');
     setEmail(currentUser?.email ?? 'juan.delacruz@gmail.com');
     setIsSocialLoggedIn(true);
-    setPaymentMethod('Card');
-    setCardName((currentUser?.name ?? 'Juan Dela Cruz').toUpperCase());
-    setCardNumber('4242 4242 4242 4242');
-    setCardExpiry('12/28');
-    setCardCVV('123');
+    setPaymentReference('GC-DEMO-123456');
   };
 
-  const handleCardNumberChange = (value: string) => {
-    // Keep digits only, limit to 16
-    const clean = value.replace(/\D/g, '').slice(0, 16);
-    // Format as four blocks of four digits: XXXX XXXX XXXX XXXX
-    const blocks = [];
-    for (let i = 0; i < clean.length; i += 4) {
-      blocks.push(clean.substring(i, i + 4));
-    }
-    setCardNumber(blocks.join(' '));
-  };
-
-  const handleExpiryChange = (value: string) => {
-    const clean = value.replace(/\D/g, '').slice(0, 4);
-    if (clean.length >= 3) {
-      setCardExpiry(`${clean.slice(0, 2)}/${clean.slice(2)}`);
+  const handleScreenshotChange = (file: File | null) => {
+    setScreenshotFile(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => setScreenshotPreview(e.target?.result as string);
+      reader.readAsDataURL(file);
     } else {
-      setCardExpiry(clean);
+      setScreenshotPreview(null);
     }
   };
+
 
   // Pricing math — use live time-based price from BookingSelector if available
   const hoursCount = effectiveSlots.length;
@@ -186,33 +166,92 @@ export default function CheckoutPage({
     return `${formatTimeLabel(firstTime)} - ${formatTimeLabel(endTimeStr)}`;
   };
 
-  // Validate form details
   const isFormValid = () => {
     if (!fullName.trim()) return false;
     if (!phoneNumber.trim()) return false;
-    
-    if (paymentMethod === 'Card') {
-      if (!cardName.trim()) return false;
-      if (cardNumber.replace(/\s/g, '').length < 16) return false;
-      if (cardExpiry.length < 5) return false;
-      if (cardCVV.length < 3) return false;
-    } else if (paymentMethod === 'GCash') {
-      if (gcashStep !== 'success' && !gcashNumber.trim()) return false;
-    }
+    if (!paymentReference.trim() && !screenshotFile) return false;
     return true;
   };
 
   const handlePaySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid()) return;
-
     setIsProcessing(true);
+    setBookingError(null);
 
     const finalBookingId = `SPC-${Math.floor(10000 + Math.random() * 90000)}`;
     const sorted = [...effectiveSlots].sort();
     const last = sorted[sorted.length - 1];
     const [lastH, lastM] = last.split(':');
     const endTime = `${(parseInt(lastH) + 1).toString().padStart(2, '0')}:${lastM}`;
+
+    let screenshotUrl: string | null = null;
+
+    if (isSupabaseEnabled && supabase) {
+      // Upload screenshot if provided
+      if (screenshotFile) {
+        const ext = screenshotFile.name.split('.').pop();
+        const path = `${finalBookingId}-${Date.now()}.${ext}`;
+        const { error: uploadErr } = await supabase.storage
+          .from('payment-screenshots')
+          .upload(path, screenshotFile, { upsert: true });
+        if (uploadErr) {
+          setIsProcessing(false);
+          setBookingError('Failed to upload screenshot. Please try again.');
+          return;
+        }
+        screenshotUrl = path;
+      }
+
+      // Insert booking as pending_verification
+      const { data: bookingRow, error: bookingErr } = await supabase
+        .from('bookings')
+        .insert({
+          booking_ref: finalBookingId,
+          booking_date: effectiveDate,
+          start_time: sorted[0],
+          end_time: endTime,
+          court_id: courtDbId ?? null,
+          court_name: effectiveCourt.name,
+          customer_name: fullName,
+          customer_phone: phoneNumber,
+          customer_email: email || null,
+          booking_status: 'pending',
+          payment_method: 'qr_payment',
+          payment_status: 'pending_verification',
+          payment_reference: paymentReference.trim() || null,
+          payment_screenshot_url: screenshotUrl,
+          total_amount: totalDue,
+        })
+        .select('id')
+        .single();
+
+      if (bookingErr) {
+        setIsProcessing(false);
+        setBookingError('Something went wrong. Please try again.');
+        return;
+      }
+
+      // Insert slots to block them while pending
+      const slotRows = effectiveSlots.map((slotTime) => ({
+        booking_id: bookingRow.id,
+        court_id: courtDbId ?? null,
+        slot_date: effectiveDate,
+        slot_time: slotTime,
+      }));
+      const { error: slotsErr } = await supabase.from('booking_slots').insert(slotRows);
+
+      if (slotsErr) {
+        await supabase.from('bookings').delete().eq('id', bookingRow.id);
+        setIsProcessing(false);
+        setBookingError('One or more slots were just taken by another player. Please go back and pick different times.');
+        return;
+      }
+    } else {
+      await new Promise((r) => setTimeout(r, 1200));
+    }
+
+    await releaseHolds();
 
     const newBookingRecord: Booking = {
       id: finalBookingId,
@@ -226,60 +265,10 @@ export default function CheckoutPage({
       status: 'Upcoming',
       fullName,
       phoneNumber,
-      paymentMethod,
-      cardEnding: paymentMethod === 'Card' ? cardNumber.slice(-4) : undefined,
+      paymentMethod: 'GCash',
       createdAt: new Date().toISOString(),
     };
 
-    if (isSupabaseEnabled && supabase) {
-      // Insert booking header
-      const { data: bookingRow, error: bookingErr } = await supabase
-        .from('bookings')
-        .insert({
-          booking_ref: finalBookingId,
-          booking_date: effectiveDate,
-          start_time: sorted[0],
-          end_time: endTime,
-          court_id: courtDbId ?? null,
-          court_name: effectiveCourt.name,
-          customer_name: fullName,
-          customer_phone: phoneNumber,
-          customer_email: email || null,
-          booking_status: 'confirmed',
-          payment_method: paymentMethod.toLowerCase().replace(' ', '_'),
-          payment_status: 'paid',
-          total_amount: totalDue,
-        })
-        .select('id')
-        .single();
-
-      if (bookingErr) {
-        setIsProcessing(false);
-        setBookingError('Something went wrong. Please try again.');
-        return;
-      }
-
-      // Insert slots — unique constraint on (court_id, slot_date, start_time) prevents double booking
-      const slotRows = effectiveSlots.map((slotTime) => ({
-        booking_id: bookingRow.id,
-        court_id: courtDbId ?? null,
-        slot_date: effectiveDate,
-        slot_time: slotTime,
-      }));
-      const { error: slotsErr } = await supabase.from('booking_slots').insert(slotRows);
-
-      if (slotsErr) {
-        // Slot was taken by someone else — roll back the booking and send user back
-        await supabase.from('bookings').delete().eq('id', bookingRow.id);
-        setIsProcessing(false);
-        setBookingError('One or more slots were just taken by another player. Please go back and pick different times.');
-        return;
-      }
-    } else {
-      await new Promise((r) => setTimeout(r, 1800));
-    }
-
-    await releaseHolds();
     onCompleteBooking(newBookingRecord);
     setIsProcessing(false);
     onNavigate('confirmed');
@@ -440,265 +429,100 @@ export default function CheckoutPage({
             </div>
           </div>
 
-          {/* Section 2: Payment Method */}
+          {/* Section 2: Payment */}
           <div className="bg-white rounded-2xl border border-slate-200/80 p-5 md:p-6 shadow-sm space-y-5">
             <div>
               <span className="font-mono text-[9px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-black uppercase tracking-wider">
                 STEP 02
               </span>
               <h2 className="text-lg font-sans font-extrabold text-slate-900 mt-1.5">
-                Payment Method
+                Payment
               </h2>
+              <p className="text-xs text-slate-500 mt-1">Scan the QR below to pay, then provide your reference number or upload a screenshot of the receipt.</p>
             </div>
 
-            {/* Payment Tabs */}
-            <div className="flex gap-2 border-b border-slate-100 pb-3">
-              {(['Card', 'GCash', 'Online Banking'] as const).map((method) => {
-                const isActive = paymentMethod === method;
-                return (
+            {/* QR Code */}
+            <div className="flex flex-col items-center gap-3 py-2">
+              <div className="w-48 h-48 rounded-2xl border-2 border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center shadow-sm">
+                <img
+                  src={QR_IMAGE_URL}
+                  alt="Payment QR Code"
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    (e.target as HTMLImageElement).parentElement!.innerHTML = '<div class="text-center p-4"><div class="text-3xl mb-2">📱</div><p class="text-xs text-slate-400 font-mono">QR Code<br/>coming soon</p></div>';
+                  }}
+                />
+              </div>
+              <div className="text-center">
+                <p className="text-xs font-bold text-slate-700">GCash / Maya / Bank Transfer</p>
+                <p className="text-xl font-black text-[#00694c] mt-0.5">₱{totalDue.toLocaleString()}</p>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 pt-4 space-y-4">
+              {/* Reference Number */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono text-slate-500 uppercase tracking-wider block">
+                  Reference Number <span className="text-slate-400 normal-case">(required if no screenshot)</span>
+                </label>
+                <input
+                  type="text"
+                  value={paymentReference}
+                  onChange={(e) => setPaymentReference(e.target.value)}
+                  placeholder="e.g. GC-123456789"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-mono focus:bg-white focus:border-[#00694c] focus:ring-1 focus:ring-[#00694c] outline-none transition-all"
+                />
+              </div>
+
+              {/* Screenshot Upload */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono text-slate-500 uppercase tracking-wider block">
+                  Payment Screenshot <span className="text-slate-400 normal-case">(required if no reference)</span>
+                </label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleScreenshotChange(e.target.files?.[0] ?? null)}
+                />
+                {!screenshotPreview ? (
                   <button
-                    key={method}
                     type="button"
-                    onClick={() => setPaymentMethod(method)}
-                    className={`flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-mono font-bold uppercase transition-all cursor-pointer ${
-                      isActive
-                        ? 'bg-[#00694c] text-white shadow-sm'
-                        : 'bg-slate-55 hover:bg-slate-100 text-slate-600'
-                    }`}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full flex flex-col items-center gap-2 py-6 border-2 border-dashed border-slate-300 hover:border-[#00694c] rounded-xl text-slate-500 hover:text-[#00694c] transition-all cursor-pointer bg-slate-50 hover:bg-[#00694c]/5"
                   >
-                    {method === 'Card' && <CreditCard className="w-4 h-4" />}
-                    {method === 'GCash' && <Smartphone className="w-4 h-4 text-[#0063E5] shrink-0" />}
-                    {method === 'Online Banking' && <Landmark className="w-4 h-4" />}
-                    {method}
+                    <Upload className="w-6 h-6" />
+                    <span className="text-xs font-semibold">Click to upload screenshot</span>
+                    <span className="text-[10px] text-slate-400">PNG, JPG, JPEG accepted</span>
                   </button>
-                );
-              })}
-            </div>
-
-            {/* Payment Contents Block */}
-            <div className="pt-2">
-              
-              {/* Card Gateway inputs & Interactive Card view */}
-              {paymentMethod === 'Card' && (
-                <div className="space-y-6">
-                  {/* Elegant Golden Credit Card Mockup */}
-                  <div className="w-full max-w-[360px] mx-auto bg-gradient-to-br from-[#1E293B] via-[#0F172A] to-slate-900 text-white rounded-xl p-5 shadow-xl relative overflow-hidden aspect-[1.586] border border-slate-800/80 transform hover:scale-[1.02] transition-transform duration-300">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-amber-400/10 to-transparent rounded-full pointer-events-none" />
-                    
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="text-[9px] font-mono tracking-widest text-[#6edba8] font-bold block uppercase">PREMIUM VIP RESIDENCY</span>
-                        <span className="text-xs text-slate-400 mt-0.5 block font-bold">Sunshine Club Pass</span>
-                      </div>
-                      <div className="w-7 h-5 bg-amber-400/20 rounded border border-amber-400/40" />
-                    </div>
-
-                    <div className="mt-8">
-                      <div className="text-lg font-mono tracking-widest font-black leading-none text-slate-100">
-                        {cardNumber || '•••• •••• •••• ••••'}
-                      </div>
-                    </div>
-
-                    <div className="mt-8 flex justify-between items-end border-t border-slate-800/60 pt-3">
-                      <div>
-                        <span className="text-[7px] font-mono text-slate-500 uppercase tracking-wider block">Cardholder</span>
-                        <span className="text-xs font-bold truncate max-w-[170px] uppercase font-mono block">
-                          {cardName || 'Juan Dela Cruz'}
-                        </span>
-                      </div>
-                      <div className="flex gap-4">
-                        <div>
-                          <span className="text-[7px] font-mono text-slate-500 uppercase tracking-wider block">Expires</span>
-                          <span className="text-xs font-mono font-bold block">{cardExpiry || 'MM/YY'}</span>
-                        </div>
-                        <div>
-                          <span className="text-[7px] font-mono text-slate-500 uppercase tracking-wider block">CVC</span>
-                          <span className="text-xs font-mono font-bold block">{cardCVV || '•••'}</span>
-                        </div>
-                      </div>
+                ) : (
+                  <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+                    <img src={screenshotPreview} alt="Payment screenshot" className="w-full max-h-48 object-contain" />
+                    <button
+                      type="button"
+                      onClick={() => { handleScreenshotChange(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                      className="absolute top-2 right-2 bg-white/90 border border-slate-200 rounded-full p-1 text-slate-600 hover:text-red-500 shadow-sm"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                    <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border-t border-emerald-200">
+                      <ImageIcon className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="text-xs font-semibold text-emerald-700">Screenshot uploaded</span>
+                      <button type="button" onClick={() => fileInputRef.current?.click()} className="text-xs text-emerald-600 hover:underline ml-auto">Change</button>
                     </div>
                   </div>
+                )}
+              </div>
 
-                  {/* Card Inputs Form */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5 col-span-2">
-                      <label className="text-xs font-mono text-slate-500 uppercase tracking-wider block">Cardholder Name</label>
-                      <input
-                        type="text"
-                        value={cardName}
-                        onChange={(e) => setCardName(e.target.value)}
-                        placeholder="Name exactly as printed"
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:bg-white focus:border-slate-800 focus:ring-1 focus:ring-slate-800 outline-none transition-all"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5 col-span-2">
-                      <label className="text-xs font-mono text-slate-500 uppercase tracking-wider block">Card Number</label>
-                      <input
-                        type="text"
-                        value={cardNumber}
-                        onChange={(e) => handleCardNumberChange(e.target.value)}
-                        placeholder="0000 0000 0000 0000"
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-mono focus:bg-white focus:border-slate-800 focus:ring-1 focus:ring-slate-800 outline-none transition-all"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-mono text-slate-500 uppercase tracking-wider block">Expiry Date</label>
-                      <input
-                        type="text"
-                        value={cardExpiry}
-                        onChange={(e) => handleExpiryChange(e.target.value)}
-                        placeholder="MM/YY"
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-mono focus:bg-white focus:border-slate-800 focus:ring-1 focus:ring-slate-800 outline-none transition-all"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-mono text-slate-500 uppercase tracking-wider block">CVV / CVC</label>
-                      <input
-                        type="password"
-                        maxLength={4}
-                        value={cardCVV}
-                        onChange={(e) => setCardCVV(e.target.value.replace(/\D/g, ''))}
-                        placeholder="3 or 4 digits"
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-mono focus:bg-white focus:border-slate-800 focus:ring-1 focus:ring-slate-800 outline-none transition-all"
-                      />
-                    </div>
-                  </div>
-                </div>
+              {/* Validation hint */}
+              {!paymentReference.trim() && !screenshotFile && (
+                <p className="text-xs text-amber-600 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  Please provide a reference number or upload a screenshot to proceed.
+                </p>
               )}
-
-              {/* GCash Simulator Terminal */}
-              {paymentMethod === 'GCash' && (
-                <div className="max-w-[400px] mx-auto border border-zinc-200 bg-[#E8F1FC] rounded-2xl p-5 shadow-md space-y-4 text-slate-800 font-sans">
-                  {/* GCash Blue Header */}
-                  <div className="bg-[#005FE5] p-3 rounded-xl flex items-center justify-between text-white -mx-2 -mt-2">
-                    <span className="font-extrabold tracking-tight text-sm">GCash Checkout</span>
-                    <span className="text-[9px] font-mono bg-white/20 px-2 py-0.5 rounded font-black uppercase">Instapay Portal</span>
-                  </div>
-
-                  {gcashStep === 'number' && (
-                    <div className="space-y-4">
-                      <p className="text-xs text-slate-600 leading-normal">
-                        To pay ₱{totalDue} with GCash, enter your registered 11-digit mobile number starting with 09 or 9.
-                      </p>
-                      
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-mono text-slate-500 uppercase tracking-wider block">GCash Number</label>
-                        <div className="relative">
-                          <span className="absolute left-3.5 top-3 text-xs font-bold font-mono text-slate-500">+63</span>
-                          <input
-                            type="text"
-                            value={gcashNumber}
-                            onChange={(e) => setGcashNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                            placeholder="912 345 6789"
-                            className="w-full pl-12 pr-4 py-2.5 border border-slate-300 rounded-xl text-sm font-mono text-slate-800 bg-white"
-                          />
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        disabled={gcashNumber.length < 10}
-                        onClick={() => setGcashStep('otp')}
-                        className={`w-full py-2.5 rounded-xl font-bold font-mono text-xs uppercase cursor-pointer ${
-                          gcashNumber.length >= 10
-                            ? 'bg-[#005FE5] text-white hover:bg-[#004bb0]'
-                            : 'bg-slate-300 text-slate-500'
-                        }`}
-                      >
-                        Request One-Time PIN
-                      </button>
-                    </div>
-                  )}
-
-                  {gcashStep === 'otp' && (
-                    <div className="space-y-4">
-                      <div className="bg-[#e8f5ee] border border-[#00694c]/30 p-3 rounded-lg text-center text-xs text-[#003d2b]">
-                        Pin Request sent. We have simulated a 4-digit OTP to +63 {gcashNumber}. (Try typing <span className="font-mono font-bold">1234</span>)
-                      </div>
-                      
-                      <div className="space-y-1 text-center">
-                        <label className="text-[10px] font-mono text-slate-500 uppercase tracking-wider block">Enter 4-Digit OTP</label>
-                        <input
-                          type="text"
-                          maxLength={4}
-                          value={gcashOtp}
-                          onChange={(e) => setGcashOtp(e.target.value.replace(/\D/g, ''))}
-                          placeholder="••••"
-                          className="w-28 text-center px-4 py-2.5 border border-slate-300 rounded-xl text-lg font-mono font-black text-slate-800 bg-white tracking-[6px]"
-                        />
-                      </div>
-
-                      <button
-                        type="button"
-                        disabled={gcashOtp.length < 4}
-                        onClick={() => setGcashStep('success')}
-                        className="w-full py-2.5 bg-[#005FE5] text-white rounded-xl font-bold font-mono text-xs uppercase hover:bg-[#004bb0] cursor-pointer"
-                      >
-                        Verify OTP & Link Wallet
-                      </button>
-                    </div>
-                  )}
-
-                  {gcashStep === 'success' && (
-                    <div className="text-center p-3 space-y-3">
-                      <div className="w-12 h-12 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto shadow-md">
-                        <Check className="w-6 h-6 border-none" />
-                      </div>
-                      <h4 className="font-sans font-bold text-slate-900 text-sm">GCash Linked Successfully!</h4>
-                      <p className="text-xs text-slate-500">Balance: ₱12,450.00. Ready to authorize payment of ₱{totalDue}.</p>
-                      
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setGcashStep('number');
-                          setGcashNumber('');
-                        }}
-                        className="text-[10px] font-mono text-[#005FE5] hover:underline bg-transparent border-none cursor-pointer"
-                      >
-                        Change GCash Account
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Online Banking Details */}
-              {paymentMethod === 'Online Banking' && (
-                <div className="space-y-4 max-w-[450px] mx-auto">
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    Select your banking institution below. Post-payment, you will be redirected back to download the invoice.
-                  </p>
-                  
-                  <div className="grid grid-cols-2 gap-2">
-                    {['BDO', 'BPI', 'UnionBank', 'Metrobank'].map((bank) => {
-                      const isBankSelected = selectedBank === bank;
-                      return (
-                        <button
-                          key={bank}
-                          type="button"
-                          onClick={() => setSelectedBank(bank)}
-                          className={`p-3.5 border rounded-xl text-center font-mono text-xs uppercase font-extrabold transition-all cursor-pointer ${
-                            isBankSelected
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-500 ring-1 ring-emerald-500'
-                              : 'bg-white border-slate-200 text-slate-600 hover:border-slate-800'
-                          }`}
-                        >
-                          {bank}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  
-                  <div className="bg-slate-50 border border-slate-100 p-3.5 rounded-xl text-xs text-slate-500">
-                    <p className="font-semibold text-slate-800 mb-1">Direct Bank Transfer Instruction</p>
-                    <p>Secured via Dragonpay. Ensure standard browser window popups are enabled for verification links.</p>
-                  </div>
-                </div>
-              )}
-
             </div>
           </div>
 
@@ -786,11 +610,11 @@ export default function CheckoutPage({
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Processing Payment...
+                    Submitting…
                   </div>
                 ) : (
                   <>
-                    <span>Authorise & Pay ₱{totalDue}</span>
+                    <span>Submit Payment — ₱{totalDue}</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
