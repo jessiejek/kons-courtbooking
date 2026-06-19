@@ -60,6 +60,13 @@ function toBase64UrlBytes(bytes: Uint8Array): string {
 }
 
 // Send FCM notification to a single token
+function fmt12(t: string): string {
+  const [h, m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
 async function sendFCM(token: string, title: string, body: string, url: string) {
   const accessToken = await getAccessToken();
   const res = await fetch(
@@ -133,7 +140,7 @@ Deno.serve(async (req) => {
         await sendFCM(
           row.token,
           '✅ Booking Confirmed!',
-          `Your booking for ${booking.courtName} on ${booking.date} at ${booking.startTime} is confirmed.`,
+          `Your booking for ${booking.courtName} on ${booking.date} at ${fmt12(booking.startTime)} is confirmed.`,
           'https://courtbooking-sooty.vercel.app/bookings',
         );
       }
