@@ -362,12 +362,12 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                   const endStr = `${endH.toString().padStart(2, '0')}:00`;
                   return (
                     <div className="mx-5 mb-4 bg-primary/5 border border-primary/25 rounded-xl px-5 py-3 flex items-center justify-between">
-                      <div>
+                      <div className="flex items-center gap-3">
                         <span className="text-sm text-primary font-bold">
-                          {durationH} hour{durationH !== 1 ? 's' : ''} selected
+                          {durationH}h · {fmtTime(startStr)} – {fmtTime(endStr)}
                         </span>
-                        <span className="text-sm text-primary/70 ml-2 font-mono">
-                          {fmtTime(startStr)} – {fmtTime(endStr)}
+                        <span className="text-sm font-extrabold text-on-surface bg-white border border-outline-variant/50 rounded-lg px-3 py-1">
+                          ₱{(durationH * (court.defaultPrice ?? 300)).toLocaleString()}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
