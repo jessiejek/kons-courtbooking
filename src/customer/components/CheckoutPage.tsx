@@ -96,11 +96,20 @@ export default function CheckoutPage({
     }
   }, [currentUser]);
 
-  const handleSocialLogin = (_platform: 'Google' | 'Facebook') => {
-    setFullName(currentUser?.name ?? 'Juan Dela Cruz');
-    setEmail(currentUser?.email ?? 'juan.delacruz@gmail.com');
-    setPhoneNumber('');
-    setIsSocialLoggedIn(true);
+  const handleSocialLogin = async (platform: 'Google' | 'Facebook') => {
+    // If already logged in just fill from currentUser
+    if (currentUser) {
+      setFullName(currentUser.name);
+      setEmail(currentUser.email);
+      setIsSocialLoggedIn(true);
+      return;
+    }
+    if (!isSupabaseEnabled || !supabase) return;
+    const provider = platform === 'Google' ? 'google' : 'facebook';
+    await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}/checkout` },
+    });
   };
 
   const handleDemoFill = () => {
