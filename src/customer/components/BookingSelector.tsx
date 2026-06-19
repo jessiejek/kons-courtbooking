@@ -72,7 +72,7 @@ const getDatesSlider = () => {
   const baseDate = new Date();
   baseDate.setHours(0, 0, 0, 0);
   
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 5; i++) {
     const d = new Date(baseDate);
     d.setDate(baseDate.getDate() + i);
     const dateStr = d.toISOString().split('T')[0];
