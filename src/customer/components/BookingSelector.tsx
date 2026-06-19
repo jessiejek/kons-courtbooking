@@ -72,7 +72,7 @@ const getDatesSlider = () => {
   const baseDate = new Date();
   baseDate.setHours(0, 0, 0, 0);
   
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 30; i++) {
     const d = new Date(baseDate);
     d.setDate(baseDate.getDate() + i);
     const dateStr = d.toISOString().split('T')[0];
@@ -418,7 +418,6 @@ export default function BookingSelector({
                       type="date"
                       value={selectedDate}
                       min={new Date().toISOString().split('T')[0]}
-                      max="2027-01-01"
                       onChange={(e) => {
                         if (e.target.value) {
                           setSelectedDate(e.target.value);
