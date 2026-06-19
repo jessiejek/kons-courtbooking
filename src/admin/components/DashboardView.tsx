@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { 
   TrendingUp, 
   Clock, 
@@ -25,36 +25,59 @@ export default function DashboardView({
   onOpenBookingDetails
 }: DashboardViewProps) {
   const [timeFilter, setTimeFilter] = useState<'today' | 'week' | 'month' | 'custom'>('today');
+  const todayD = new Date();
+  const todayStr = `${todayD.getFullYear()}-${String(todayD.getMonth()+1).padStart(2,'0')}-${String(todayD.getDate()).padStart(2,'0')}`;
+  const [customFrom, setCustomFrom] = useState(todayStr);
+  const [customTo, setCustomTo] = useState(todayStr);
 
   const activeCourtsCount = courts.filter(c => c.status === 'active').length;
   const totalCourtsCount = courts.length;
 
-  // Today string
-  const todayD = new Date();
-  const todayStr = `${todayD.getFullYear()}-${String(todayD.getMonth()+1).padStart(2,'0')}-${String(todayD.getDate()).padStart(2,'0')}`;
+  // Derive date range from filter
+  const { rangeFrom, rangeTo, rangeLabel, chartDays } = useMemo(() => {
+    const d = new Date(todayD);
+    if (timeFilter === 'today') {
+      return { rangeFrom: todayStr, rangeTo: todayStr, rangeLabel: "Today's", chartDays: 1 };
+    } else if (timeFilter === 'week') {
+      const from = new Date(d); from.setDate(d.getDate() - 6);
+      const f = `${from.getFullYear()}-${String(from.getMonth()+1).padStart(2,'0')}-${String(from.getDate()).padStart(2,'0')}`;
+      return { rangeFrom: f, rangeTo: todayStr, rangeLabel: 'This Week', chartDays: 7 };
+    } else if (timeFilter === 'month') {
+      const f = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+      return { rangeFrom: f, rangeTo: todayStr, rangeLabel: 'This Month', chartDays: 30 };
+    } else {
+      const days = Math.max(1, Math.round((new Date(customTo).getTime() - new Date(customFrom).getTime()) / 86400000) + 1);
+      return { rangeFrom: customFrom, rangeTo: customTo, rangeLabel: `${customFrom} – ${customTo}`, chartDays: days };
+    }
+  }, [timeFilter, customFrom, customTo, todayStr]);
 
-  // Today's bookings count
-  const todayBookings = bookings.filter(b => b.date === todayStr && b.status !== 'cancelled');
+  const inRange = (date: string) => date >= rangeFrom && date <= rangeTo;
 
-  // Revenue: this month confirmed/paid bookings
-  const totalRevenue = bookings
-    .filter(b => (b.status === 'paid' || b.status === 'completed' || b.status === 'confirmed') && b.date?.startsWith(`${todayD.getFullYear()}-${String(todayD.getMonth()+1).padStart(2,'0')}`))
+  const filteredBookings = bookings.filter(b => inRange(b.date));
+
+  // Today's bookings count (always today regardless of filter for the top card label)
+  const periodBookings = filteredBookings.filter(b => b.status !== 'cancelled');
+
+  // Revenue
+  const totalRevenue = filteredBookings
+    .filter(b => b.status === 'paid' || b.status === 'completed' || b.status === 'confirmed')
     .reduce((sum, b) => sum + b.amount, 0);
 
-  // Occupancy: confirmed slots today / (active courts * 24 slots)
-  const confirmedTodaySlots = bookings
-    .filter(b => b.date === todayStr && (b.status === 'confirmed' || b.status === 'paid'))
-    .reduce((sum, b) => sum + (Math.max(1, (parseInt(b.endTime) || 0) - (parseInt(b.time) || 0))), 0);
-  const totalCapacity = Math.max(1, activeCourtsCount * 24);
-  const occupancyRate = Math.min(100, Math.round((confirmedTodaySlots / totalCapacity) * 100));
+  const slotHours = (b: Booking) => Math.max(1, (parseInt(b.endTime) || 0) - (parseInt(b.time) || 0));
 
-  // Per-court occupancy (all-time confirmed slots / court's share of total capacity)
+  // Occupancy: confirmed slots in range / (active courts * 24 * days)
+  const confirmedSlots = filteredBookings
+    .filter(b => b.status === 'confirmed' || b.status === 'paid')
+    .reduce((sum, b) => sum + slotHours(b), 0);
+  const totalCapacity = Math.max(1, activeCourtsCount * 24 * chartDays);
+  const occupancyRate = Math.min(100, Math.round((confirmedSlots / totalCapacity) * 100));
+
+  // Per-court occupancy within range
   const courtOccupancy = courts.map(c => {
-    const slots = bookings
+    const slots = filteredBookings
       .filter(b => b.courtId === c.id && (b.status === 'confirmed' || b.status === 'paid'))
-      .reduce((sum, b) => sum + (Math.max(1, (parseInt(b.endTime) || 0) - (parseInt(b.time) || 0))), 0);
-    // base capacity: 24 slots × last 30 days
-    const cap = 24 * 30;
+      .reduce((sum, b) => sum + slotHours(b), 0);
+    const cap = Math.max(1, 24 * chartDays);
     return { ...c, pct: Math.min(100, Math.round((slots / cap) * 100)) };
   });
 
@@ -67,29 +90,37 @@ export default function DashboardView({
     }).format(val);
   };
 
-  // Build revenue chart from real booking data (last 7 days)
+  // Build revenue chart — one bar per day in the range (cap at 30 bars)
   const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const today = new Date();
   const revenueByDay: Record<string, number> = {};
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    revenueByDay[d.toISOString().slice(0, 10)] = 0;
+  const fromMs = new Date(rangeFrom + 'T00:00:00').getTime();
+  const toMs   = new Date(rangeTo   + 'T00:00:00').getTime();
+  const totalDays = Math.round((toMs - fromMs) / 86400000) + 1;
+  const maxBars = 30;
+  const step = Math.ceil(totalDays / maxBars);
+  for (let i = 0; i < totalDays; i += step) {
+    const d = new Date(fromMs + i * 86400000);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    revenueByDay[key] = 0;
   }
-  bookings
+  filteredBookings
     .filter(b => b.status === 'paid' || b.status === 'completed' || b.status === 'confirmed')
     .forEach(b => {
-      if (revenueByDay[b.date] !== undefined) revenueByDay[b.date] += b.amount;
+      // find nearest bucket key
+      const keys = Object.keys(revenueByDay);
+      const closest = keys.reduce((prev, cur) => (Math.abs(new Date(cur).getTime() - new Date(b.date).getTime()) < Math.abs(new Date(prev).getTime() - new Date(b.date).getTime()) ? cur : prev), keys[0]);
+      if (closest) revenueByDay[closest] += b.amount;
     });
   const revenueData = Object.entries(revenueByDay).map(([date, value]) => {
-    const d = new Date(date);
-    return { day: dayLabels[d.getDay()], value, label: value >= 1000 ? `₱${(value / 1000).toFixed(1)}k` : `₱${value}` };
+    const d = new Date(date + 'T00:00:00');
+    const label = totalDays === 1 ? 'Today' : totalDays <= 7 ? dayLabels[d.getDay()] : `${d.getMonth()+1}/${d.getDate()}`;
+    return { day: label, value };
   });
   const peakValue = Math.max(...revenueData.map(r => r.value), 1);
   const revenueDataWithPeak = revenueData.map(r => ({ ...r, isPeak: r.value === peakValue && peakValue > 0 }));
 
-  // Show the 4 most recent bookings on the dashboard
-  const dashboardBookings = [...bookings]
+  // Show 4 most recent bookings in selected range
+  const dashboardBookings = [...filteredBookings]
     .sort((a, b) => (b.bookingId > a.bookingId ? 1 : -1))
     .slice(0, 4);
 
@@ -133,6 +164,29 @@ export default function DashboardView({
             <Calendar className="w-3.5 h-3.5" />
           </button>
         </div>
+
+        {/* Custom date range inputs */}
+        {timeFilter === 'custom' && (
+          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-outline-variant/30">
+            <span className="text-xs text-on-surface-variant font-medium">From</span>
+            <input
+              type="date"
+              value={customFrom}
+              max={customTo}
+              onChange={e => setCustomFrom(e.target.value)}
+              className="border border-outline-variant rounded px-2 py-1 text-xs text-on-surface bg-white focus:outline-none focus:border-primary"
+            />
+            <span className="text-xs text-on-surface-variant font-medium">To</span>
+            <input
+              type="date"
+              value={customTo}
+              min={customFrom}
+              max={todayStr}
+              onChange={e => setCustomTo(e.target.value)}
+              className="border border-outline-variant rounded px-2 py-1 text-xs text-on-surface bg-white focus:outline-none focus:border-primary"
+            />
+          </div>
+        )}
       </div>
 
       {/* Stats Bento Grid */}
@@ -145,10 +199,10 @@ export default function DashboardView({
             </span>
           </div>
           <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-            Today's Bookings
+            {rangeLabel} Bookings
           </p>
           <h3 className="text-4xl font-extrabold text-on-surface mt-1.5 font-headline">
-            {todayBookings.length}
+            {periodBookings.length}
           </h3>
         </div>
 
@@ -161,7 +215,7 @@ export default function DashboardView({
             <TrendingUp className="w-4 h-4 text-secondary" />
           </div>
           <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-            Revenue This Month
+            Revenue ({rangeLabel})
           </p>
           <h3 className="text-4xl font-extrabold text-on-surface mt-1.5 font-headline">
             {formatCurrency(totalRevenue)}
@@ -283,7 +337,7 @@ export default function DashboardView({
       {/* Bookings List Section */}
       <div className="bg-white border border-outline-variant rounded-lg overflow-hidden shadow-sm">
         <div className="p-5 border-b border-outline-variant flex justify-between items-center bg-surface-container-low/10">
-          <h4 className="font-semibold text-base text-on-surface">Today's Bookings</h4>
+          <h4 className="font-semibold text-base text-on-surface">{rangeLabel} Bookings</h4>
           <button 
             onClick={() => onNavigateToTab('bookings')}
             className="text-primary hover:text-opacity-85 font-semibold text-xs flex items-center gap-1.5 group transition-colors uppercase tracking-wider"
