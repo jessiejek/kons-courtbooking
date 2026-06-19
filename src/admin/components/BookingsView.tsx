@@ -43,12 +43,7 @@ export default function BookingsView({
   const itemsPerPage = 8; // fits nicely on screen
 
   // Unique lists of courts and statuses present in our data
-  const courtNames = useMemo(() => {
-    const list = courts.map(c => c.name);
-    // Add any separate names present in initial defaultbookings
-    const extraNames = ['West Court', 'East Court', 'Indoor Studio'];
-    return Array.from(new Set([...list, ...extraNames]));
-  }, [courts]);
+  const courtNames = useMemo(() => courts.map(c => c.name), [courts]);
 
   const statuses: BookingStatus[] = ['paid', 'confirmed', 'pending', 'cancelled', 'completed'];
 
@@ -82,6 +77,18 @@ export default function BookingsView({
       .filter(b => b.status !== 'cancelled')
       .reduce((sum, b) => sum + b.amount, 0);
   }, [filteredBookings]);
+
+  // Real KPI stats derived from all bookings
+  const { revenueAllTime, mostBookedCourt, mostBookedCount, uniqueCustomers } = useMemo(() => {
+    const active = bookings.filter(b => b.status !== 'cancelled');
+    const revenueAllTime = active.reduce((s, b) => s + b.amount, 0);
+    const courtCounts: Record<string, number> = {};
+    active.forEach(b => { courtCounts[b.courtName] = (courtCounts[b.courtName] ?? 0) + 1; });
+    const mostBookedCourt = Object.keys(courtCounts).sort((a, b) => courtCounts[b] - courtCounts[a])[0] ?? '—';
+    const mostBookedCount = courtCounts[mostBookedCourt] ?? 0;
+    const uniqueCustomers = new Set(active.map(b => b.phone)).size;
+    return { revenueAllTime, mostBookedCourt, mostBookedCount, uniqueCustomers };
+  }, [bookings]);
 
   // Format currency
   const formatCurrency = (val: number) => {
@@ -324,45 +331,45 @@ export default function BookingsView({
         </div>
       </div>
 
-      {/* Bottom KPI Cards matching design system for premium look */}
+      {/* Bottom KPI Cards — real data only */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 border border-outline-variant rounded-lg group hover:border-primary transition-all duration-300">
+        <div className="bg-white p-6 border border-outline-variant rounded-lg hover:border-primary transition-all duration-300">
           <div className="flex justify-between items-start mb-4">
-            <div className="p-2 bg-secondary-container text-primary rounded-lg">
+            <div className="p-2 bg-secondary-container rounded-lg">
               <TrendingUp className="w-5 h-5 text-primary" />
             </div>
-            <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded">
-              +12% vs last week
+            <span className="text-xs font-bold text-on-surface-variant bg-surface-container px-2 py-0.5 rounded">
+              all time
             </span>
           </div>
-          <h3 className="text-2xl font-bold font-headline text-on-surface">₱18,400</h3>
-          <p className="text-xs text-on-surface-variant mt-1">Revenue this week</p>
+          <h3 className="text-2xl font-bold font-headline text-on-surface">{formatCurrency(revenueAllTime)}</h3>
+          <p className="text-xs text-on-surface-variant mt-1">Total revenue (non-cancelled)</p>
         </div>
 
-        <div className="bg-white p-6 border border-outline-variant rounded-lg group hover:border-primary transition-all duration-300">
+        <div className="bg-white p-6 border border-outline-variant rounded-lg hover:border-primary transition-all duration-300">
           <div className="flex justify-between items-start mb-4">
-            <div className="p-2 bg-secondary-container text-primary rounded-lg">
+            <div className="p-2 bg-secondary-container rounded-lg">
               <Clock className="w-5 h-5 text-primary" />
             </div>
             <span className="text-xs font-bold text-on-surface-variant bg-surface-container px-2 py-0.5 rounded">
-              82% utilization
+              {mostBookedCount} booking{mostBookedCount !== 1 ? 's' : ''}
             </span>
           </div>
-          <h3 className="text-2xl font-bold font-headline text-on-surface">Center Court</h3>
-          <p className="text-xs text-on-surface-variant mt-1">Most booked facility</p>
+          <h3 className="text-2xl font-bold font-headline text-on-surface truncate">{mostBookedCourt}</h3>
+          <p className="text-xs text-on-surface-variant mt-1">Most booked court</p>
         </div>
 
-        <div className="bg-white p-6 border border-outline-variant rounded-lg group hover:border-primary transition-all duration-300">
+        <div className="bg-white p-6 border border-outline-variant rounded-lg hover:border-primary transition-all duration-300">
           <div className="flex justify-between items-start mb-4">
-            <div className="p-2 bg-secondary-container text-primary rounded-lg">
+            <div className="p-2 bg-secondary-container rounded-lg">
               <Users className="w-5 h-5 text-primary" />
             </div>
             <span className="text-xs font-bold text-on-surface-variant bg-surface-container px-2 py-0.5 rounded">
-              14 New members
+              by phone number
             </span>
           </div>
-          <h3 className="text-2xl font-bold font-headline text-on-surface">312</h3>
-          <p className="text-xs text-on-surface-variant mt-1">Active Players</p>
+          <h3 className="text-2xl font-bold font-headline text-on-surface">{uniqueCustomers}</h3>
+          <p className="text-xs text-on-surface-variant mt-1">Unique customers</p>
         </div>
       </div>
     </div>
