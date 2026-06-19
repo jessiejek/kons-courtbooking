@@ -80,12 +80,14 @@ export default function CheckoutPage({
     return () => { releaseHolds(); };
   }, []);
 
-  // Redirect if no slots selected on mount
-  useEffect(() => {
-    if (selectedSlots.length === 0) {
-      onNavigate('booking');
-    }
-  }, [selectedSlots, onNavigate]);
+  // Demo fallback when accessed directly with no slots (e.g. /checkout via URL bar)
+  const isDemo = selectedSlots.length === 0;
+  const demoSlots = ['09:00', '10:00'];
+  const effectiveSlots = isDemo ? demoSlots : selectedSlots;
+  const effectiveCourt = isDemo
+    ? { ...selectedCourt, name: selectedCourt.name || 'Court 1 (Premium Indoor)', pricePerHour: selectedCourt.pricePerHour || 300 }
+    : selectedCourt;
+  const effectiveDate = isDemo ? new Date().toISOString().split('T')[0] : selectedDate;
 
   // Pre-fill guest details from logged-in user
   useEffect(() => {
@@ -145,8 +147,8 @@ export default function CheckoutPage({
   };
 
   // Pricing math — use live time-based price from BookingSelector if available
-  const hoursCount = selectedSlots.length;
-  const courtPrice = finalPriceProp ?? hoursCount * selectedCourt.pricePerHour;
+  const hoursCount = effectiveSlots.length;
+  const courtPrice = (isDemo ? null : finalPriceProp) ?? hoursCount * effectiveCourt.pricePerHour;
   const loyaltySavings = 0; // already applied in BookingSelector finalPrice
   const processingFee = paymentMethod === 'Card' ? 25 : 0;
   const totalDue = Math.max(0, courtPrice + processingFee);
@@ -159,14 +161,14 @@ export default function CheckoutPage({
 
   // Convert to date read
   const getReadableSelectedDate = () => {
-    const d = new Date(selectedDate);
+    const d = new Date(effectiveDate);
     return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   // Generates selected intervals label
   const getSelectedTimeRangeLabel = () => {
-    if (selectedSlots.length === 0) return '';
-    const sorted = [...selectedSlots].sort();
+    if (effectiveSlots.length === 0) return '';
+    const sorted = [...effectiveSlots].sort();
     
     const formatTimeLabel = (t: string) => {
       const [h, m] = t.split(':');
@@ -208,19 +210,19 @@ export default function CheckoutPage({
     setIsProcessing(true);
 
     const finalBookingId = `SPC-${Math.floor(10000 + Math.random() * 90000)}`;
-    const sorted = [...selectedSlots].sort();
+    const sorted = [...effectiveSlots].sort();
     const last = sorted[sorted.length - 1];
     const [lastH, lastM] = last.split(':');
     const endTime = `${(parseInt(lastH) + 1).toString().padStart(2, '0')}:${lastM}`;
 
     const newBookingRecord: Booking = {
       id: finalBookingId,
-      courtId: selectedCourt.id,
-      courtName: selectedCourt.name,
-      date: selectedDate,
+      courtId: effectiveCourt.id,
+      courtName: effectiveCourt.name,
+      date: effectiveDate,
       startTime: sorted[0],
       endTime,
-      slots: selectedSlots,
+      slots: effectiveSlots,
       price: totalDue,
       status: 'Upcoming',
       fullName,
@@ -236,11 +238,11 @@ export default function CheckoutPage({
         .from('bookings')
         .insert({
           booking_ref: finalBookingId,
-          booking_date: selectedDate,
+          booking_date: effectiveDate,
           start_time: sorted[0],
           end_time: endTime,
           court_id: courtDbId ?? null,
-          court_name: selectedCourt.name,
+          court_name: effectiveCourt.name,
           customer_name: fullName,
           customer_phone: phoneNumber,
           customer_email: email || null,
@@ -259,10 +261,10 @@ export default function CheckoutPage({
       }
 
       // Insert slots — unique constraint on (court_id, slot_date, start_time) prevents double booking
-      const slotRows = selectedSlots.map((slotTime) => ({
+      const slotRows = effectiveSlots.map((slotTime) => ({
         booking_id: bookingRow.id,
         court_id: courtDbId ?? null,
-        slot_date: selectedDate,
+        slot_date: effectiveDate,
         slot_time: slotTime,
       }));
       const { error: slotsErr } = await supabase.from('booking_slots').insert(slotRows);
@@ -729,9 +731,9 @@ export default function CheckoutPage({
             <div className="space-y-4">
               <div>
                 <span className="text-[10px] font-mono text-slate-400 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded font-bold uppercase block w-fit">
-                  {selectedCourt.type} Court Facility
+                  {effectiveCourt.type} Court Facility
                 </span>
-                <h4 className="font-sans font-bold text-sm text-slate-900 mt-1.5">{selectedCourt.name}</h4>
+                <h4 className="font-sans font-bold text-sm text-slate-900 mt-1.5">{effectiveCourt.name}</h4>
                 <p className="text-xs text-slate-500 mt-1">{getReadableSelectedDate()}</p>
                 <p className="text-xs font-semibold text-[#003d2b] mt-1 bg-[#bbead4] px-2 py-1 rounded w-fit">{getSelectedTimeRangeLabel()}</p>
               </div>
