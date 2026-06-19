@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from
 import CustomerApp from './customer/CustomerApp';
 import AdminApp from './admin/AdminApp';
 import { supabase, isSupabaseEnabled } from './lib/supabase';
+import { useFCM } from './hooks/useFCM';
 
 export interface CurrentUser {
   name: string;
@@ -51,6 +52,8 @@ export default function App() {
   const [role, setRole] = useState<'user' | 'admin' | null>(null);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [authReady, setAuthReady] = useState(!isSupabaseEnabled);
+
+  useFCM(currentUser?.email, role);
 
   const applySession = (session: any) => {
     if (session?.user) {
