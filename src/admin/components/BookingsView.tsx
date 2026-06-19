@@ -205,7 +205,7 @@ export default function BookingsView({
 
       {/* Main Data Table */}
       <div className="bg-white border border-outline-variant rounded-lg overflow-hidden shadow-sm">
-        <div className="overflow-x-auto custom-scrollbar">
+        <div className="overflow-x-auto custom-scrollbar w-full">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-outline-variant bg-surface-container-low/50 text-[10px] text-outline uppercase tracking-wider font-bold">

@@ -400,9 +400,9 @@ export default function CourtsPricingView({
 
       {/* ── SECTION 2: Per-Court Overrides ── */}
       <section className="space-y-4">
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex flex-wrap items-center gap-2 mb-2">
           <h3 className="font-extrabold text-on-surface text-lg">Per-Court Pricing</h3>
-          <span className="text-xs text-on-surface-variant font-medium">— override global rates for specific courts</span>
+          <span className="text-xs text-on-surface-variant font-medium hidden sm:inline">— override global rates for specific courts</span>
         </div>
 
         {courts.map(court => {
@@ -413,7 +413,7 @@ export default function CourtsPricingView({
           return (
             <div key={court.id} className="bg-white border border-outline-variant rounded-2xl overflow-hidden shadow-sm">
               {/* Court header row */}
-              <div className="flex items-center gap-4 px-6 py-4">
+              <div className="flex flex-wrap items-center gap-3 px-4 py-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2.5">
                     <h4 className="font-extrabold text-on-surface text-sm">{court.name}</h4>
