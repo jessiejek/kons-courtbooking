@@ -88,7 +88,7 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
   const [nbPayment, setNbPayment] = useState<'cash' | 'gcash'>('cash');
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => { loadSchedule(); }, [viewDate]);
+  useEffect(() => { loadSchedule(); loadGlobalRates(); }, [viewDate]);
 
   const loadGlobalRates = async () => {
     if (!isSupabaseEnabled || !supabase) return;
@@ -361,17 +361,17 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                       } else if (nonContiguous) {
                         cellClass = 'bg-slate-50 border-slate-100 cursor-not-allowed opacity-35';
                         hourLabelClass = 'text-slate-400';
-                        subText = 'open';
+                        subText = `₱${getRateForHour(toH(hour), court.id, courtUseGlobal[court.id] ?? true, allRates, court.defaultPrice ?? 300)}`;
                         subClass = 'text-slate-300 text-[10px]';
                       } else if (isCurrentHour) {
                         cellClass = 'bg-amber-50 border-amber-300 cursor-pointer hover:border-amber-400 hover:bg-amber-100';
                         hourLabelClass = 'text-amber-700 font-semibold';
-                        subText = 'now · open';
+                        subText = `₱${getRateForHour(toH(hour), court.id, courtUseGlobal[court.id] ?? true, allRates, court.defaultPrice ?? 300)}`;
                         subClass = 'text-amber-600 text-[10px] font-medium';
                       } else {
                         cellClass = 'bg-white border-outline-variant/50 cursor-pointer hover:border-primary hover:bg-primary/5 hover:shadow-sm';
                         hourLabelClass = 'text-on-surface-variant';
-                        subText = 'open';
+                        subText = `₱${getRateForHour(toH(hour), court.id, courtUseGlobal[court.id] ?? true, allRates, court.defaultPrice ?? 300)}`;
                         subClass = 'text-on-surface-variant/60 text-[10px]';
                       }
 
@@ -389,7 +389,7 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                             ({fmtHour(hour)}–{fmtHour(`${(toH(hour)+1).toString().padStart(2,'0')}:00`)})
                           </span>
                           <span className={`mt-0.5 block truncate max-w-[64px] leading-tight ${subClass}`}>
-                            {booking ? booking.customer_name.split(' ')[0] : isSelected ? 'selected' : isCurrentHour ? 'now · open' : 'open'}
+                            {booking ? booking.customer_name.split(' ')[0] : isSelected ? 'selected' : subText}
                           </span>
                           {booking && (
                             <span className={`text-[9px] mt-0.5 capitalize ${isWalkin ? 'text-amber-500' : 'text-[#00694c]/70'}`}>
