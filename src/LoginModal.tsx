@@ -85,13 +85,20 @@ export default function LoginModal({ isOpen, onClose, onLogin }: Props) {
     if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
     if (isSupabaseEnabled && supabase) {
       setIsLoading(true);
-      const { error: err } = await supabase.auth.signUp({
+      const { data, error: err } = await supabase.auth.signUp({
         email, password, options: { data: { role: 'user' } },
       });
       setIsLoading(false);
       if (err) { setError(err.message); return; }
-      setSuccessMsg('Account created! Check your email to confirm, then sign in.');
-      setAuthMode('signin');
+      // If session is returned immediately, email confirmation is off — log in directly
+      if (data.session) {
+        onLogin('user');
+        onClose();
+      } else {
+        // Confirmation email was sent (email confirm is ON in Supabase)
+        setSuccessMsg('Account created! Check your email to confirm, then sign in.');
+        setAuthMode('signin');
+      }
       return;
     }
     onLogin('user');
