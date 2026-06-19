@@ -294,8 +294,8 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
               } ${isMaintenance ? 'opacity-50' : ''}`}>
 
                 {/* Court header */}
-                <div className="flex items-center justify-between px-5 py-3.5 bg-surface-container-low/40 border-b border-outline-variant/30">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-surface-container-low/40 border-b border-outline-variant/30">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
                     <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                       <span className="text-primary font-black text-sm">{court.id}</span>
                     </div>
@@ -307,7 +307,7 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                       <span className="text-[10px] font-bold uppercase bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded">maintenance</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs text-on-surface-variant">{bookings.length} booking{bookings.length !== 1 ? 's' : ''}</span>
                     {viewDate === today && (
                       <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${
@@ -411,8 +411,8 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                   const startStr = `${startH.toString().padStart(2, '0')}:00`;
                   const endStr = `${endH.toString().padStart(2, '0')}:00`;
                   return (
-                    <div className="mx-5 mb-4 bg-primary/5 border border-primary/25 rounded-xl px-5 py-3 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
+                    <div className="mx-4 mb-4 bg-primary/5 border border-primary/25 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <span className="text-sm text-primary font-bold">
                           {durationH}h · {fmtTime(startStr)} – {fmtTime(endStr)}
                         </span>
@@ -429,7 +429,7 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                         </button>
                         <button
                           onClick={() => openFormForCourt(court.id)}
-                          className="flex items-center gap-1.5 bg-primary text-white text-sm font-bold px-5 py-2.5 rounded-lg shadow-md hover:opacity-90 transition-all"
+                          className="flex items-center gap-1.5 bg-primary text-white text-sm font-bold px-4 py-2.5 rounded-lg shadow-md hover:opacity-90 transition-all"
                         >
                           <Plus className="w-4 h-4" />
                           Add walk-in ({durationH}h)

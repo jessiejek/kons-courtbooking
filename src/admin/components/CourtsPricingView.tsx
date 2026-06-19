@@ -63,27 +63,25 @@ function RangeEditor({
         </div>
       )}
       {ranges.map((r, i) => (
-        <div key={r.id} className="flex items-center gap-3 bg-surface-container-low/30 border border-outline-variant rounded-xl px-4 py-3">
-          <div className="flex items-center gap-2 flex-1">
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-outline mb-1">From</span>
-              <input
-                type="time"
-                value={r.start}
-                onChange={(e) => update(i, 'start', e.target.value)}
-                className="bg-white border border-outline-variant rounded-lg px-3 py-2 text-sm font-mono font-bold focus:border-primary focus:outline-none w-32"
-              />
-            </div>
-            <span className="text-outline font-bold mt-4">→</span>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-outline mb-1">To</span>
-              <input
-                type="time"
-                value={r.end}
-                onChange={(e) => update(i, 'end', e.target.value)}
-                className="bg-white border border-outline-variant rounded-lg px-3 py-2 text-sm font-mono font-bold focus:border-primary focus:outline-none w-32"
-              />
-            </div>
+        <div key={r.id} className="flex flex-wrap items-end gap-3 bg-surface-container-low/30 border border-outline-variant rounded-xl px-4 py-3">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-outline mb-1">From</span>
+            <input
+              type="time"
+              value={r.start}
+              onChange={(e) => update(i, 'start', e.target.value)}
+              className="bg-white border border-outline-variant rounded-lg px-3 py-2 text-sm font-mono font-bold focus:border-primary focus:outline-none w-32"
+            />
+          </div>
+          <span className="text-outline font-bold pb-2.5">→</span>
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-outline mb-1">To</span>
+            <input
+              type="time"
+              value={r.end}
+              onChange={(e) => update(i, 'end', e.target.value)}
+              className="bg-white border border-outline-variant rounded-lg px-3 py-2 text-sm font-mono font-bold focus:border-primary focus:outline-none w-32"
+            />
           </div>
           <div className="flex flex-col">
             <span className="text-[10px] font-bold uppercase tracking-wider text-outline mb-1">Rate / hr</span>
@@ -99,7 +97,7 @@ function RangeEditor({
           </div>
           <button
             onClick={() => remove(i)}
-            className="mt-4 p-2 text-outline hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+            className="p-2 text-outline hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -330,7 +328,7 @@ export default function CourtsPricingView({
 
       {/* ── SECTION 1: Global Pricing ── */}
       <section className="bg-white border border-outline-variant rounded-2xl overflow-hidden shadow-sm">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-outline-variant/30 bg-surface-container-low/20">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 border-b border-outline-variant/30 bg-surface-container-low/20">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[#e8f5ee] flex items-center justify-center">
               <Globe className="w-5 h-5 text-primary" />

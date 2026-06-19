@@ -141,7 +141,7 @@ export default function DashboardView({
         </div>
         
         {/* Date scope control */}
-        <div className="flex bg-white border border-outline-variant rounded p-1 shadow-sm">
+        <div className="flex flex-wrap bg-white border border-outline-variant rounded p-1 shadow-sm">
           {(['today', 'week', 'month'] as const).map((filter) => (
             <button
               key={filter}
@@ -328,7 +328,7 @@ export default function DashboardView({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full min-w-[480px] text-left">
             <thead className="bg-surface-container-low/40 text-[10px] text-outline uppercase tracking-wider font-bold">
               <tr>
                 <th className="px-6 py-3.5 font-bold">Time (Start – End)</th>
