@@ -120,16 +120,18 @@ export default function BookingsHistory({
   };
 
   return (
-    <div className="bg-slate-50 min-h-screen font-sans flex flex-col">
+    <div className="bg-[#f9f9f7] min-h-screen font-sans flex flex-col">
       {/* Header Bar */}
-      <header className="bg-slate-900 text-white py-4 px-6 border-b border-slate-800 sticky top-0 z-40 flex items-center justify-between">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate('landing')}>
-          <div className="w-8 h-8 rounded-lg bg-[#00694c] flex items-center justify-center">
-            <span className="font-mono text-white font-extrabold text-[15px]">S</span>
+      <header className="bg-[#111412] text-white sticky top-0 z-40 shadow-sm">
+        <div className="h-[3px] bg-[#00694c]" />
+        <div className="px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => onNavigate('landing')}>
+          <div className="w-7 h-7 rounded-lg bg-[#00694c] flex items-center justify-center shrink-0">
+            <span className="text-white font-black text-xs leading-none">S</span>
           </div>
           <div>
-            <span className="font-sans font-black uppercase text-sm tracking-tight block">Sunshine pickleball</span>
-            <span className="font-mono text-[8px] uppercase tracking-widest text-[#6edba8] -mt-1 block font-semibold">User Dashboard</span>
+            <span className="font-extrabold text-sm tracking-tight block">Sunshine <span className="font-medium text-white/50">Pickleball</span></span>
+            <span className="font-mono text-[8px] uppercase tracking-widest text-[#6edba8] block font-semibold -mt-0.5">My Bookings</span>
           </div>
         </div>
         
@@ -155,10 +157,11 @@ export default function BookingsHistory({
             + Book a court
           </button>
         </div>
+        </div>
       </header>
 
       {/* Hero Welcome Banner */}
-      <section className="bg-slate-900 text-white py-8 px-6 border-b border-white/5">
+      <section className="bg-[#111412] text-white py-8 px-6 border-b border-white/5">
         <div className="max-w-7xl w-full mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <span className="text-[10px] bg-[#00694c]/10 text-[#6edba8] border border-[#00694c]/20 font-mono font-bold px-2.5 py-1 rounded-full uppercase">

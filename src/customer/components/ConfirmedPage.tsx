@@ -73,16 +73,18 @@ export default function ConfirmedPage({ onNavigate, booking, onOpenLogin, role, 
   };
 
   return (
-    <div className="bg-slate-50 min-h-screen font-sans flex flex-col">
+    <div className="bg-[#f9f9f7] min-h-screen font-sans flex flex-col">
       {/* Hidden receipt for PDF capture */}
       <BookingReceiptPDF booking={details as Booking} divRef={receiptRef} />
 
-      <header className="bg-slate-900 text-white py-4 px-6 border-b border-slate-800 sticky top-0 z-40 flex items-center justify-between">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate('landing')}>
-          <div className="w-7 h-7 rounded-lg bg-[#00694c] flex items-center justify-center">
-            <span className="font-black text-white text-sm">S</span>
+      <header className="bg-[#111412] text-white sticky top-0 z-40 shadow-sm">
+        <div className="h-[3px] bg-[#00694c]" />
+        <div className="px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => onNavigate('landing')}>
+          <div className="w-7 h-7 rounded-lg bg-[#00694c] flex items-center justify-center shrink-0">
+            <span className="text-white font-black text-xs leading-none">S</span>
           </div>
-          <span className="font-sans font-black uppercase text-sm tracking-tight">Sunshine Pickleball</span>
+          <span className="font-extrabold text-sm tracking-tight">Sunshine <span className="font-medium text-white/50">Pickleball</span></span>
         </div>
         <div className="flex items-center gap-3 text-xs font-mono">
           {role ? (
@@ -97,6 +99,7 @@ export default function ConfirmedPage({ onNavigate, booking, onOpenLogin, role, 
           ) : (
             <button onClick={onOpenLogin} className="text-slate-300 hover:text-white transition-colors py-1 px-3 border border-slate-600 hover:border-slate-400 rounded">Log in</button>
           )}
+        </div>
         </div>
       </header>
 

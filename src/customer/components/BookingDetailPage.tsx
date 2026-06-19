@@ -142,17 +142,24 @@ export default function BookingDetailPage({
 
 
   return (
-    <div className="bg-slate-50 min-h-screen font-sans flex flex-col">
+    <div className="bg-[#f9f9f7] min-h-screen font-sans flex flex-col">
       {/* Header Bar */}
-      <header className="bg-slate-900 text-white py-4 px-6 border-b border-slate-800 sticky top-0 z-40 flex items-center justify-between shadow-sm">
-        <button 
+      <header className="bg-[#111412] text-white sticky top-0 z-40 shadow-sm">
+        <div className="h-[3px] bg-[#00694c]" />
+        <div className="px-6 py-4 flex items-center justify-between">
+        <button
           onClick={() => onNavigate('bookings-list')}
           className="flex items-center gap-3 bg-transparent border-none cursor-pointer text-left"
         >
-          <ChevronLeft className="w-5 h-5 text-slate-400 hover:text-white" />
-          <div>
-            <span className="font-sans font-black uppercase text-sm tracking-tight block">Sunshine pickleball</span>
-            <span className="font-mono text-[8px] uppercase tracking-widest text-[#6edba8] block font-semibold">User Bookings</span>
+          <ChevronLeft className="w-5 h-5 text-white/40 hover:text-white" />
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-[#00694c] flex items-center justify-center shrink-0">
+              <span className="text-white font-black text-xs leading-none">S</span>
+            </div>
+            <div>
+              <span className="font-extrabold text-sm tracking-tight block">Sunshine <span className="font-medium text-white/50">Pickleball</span></span>
+              <span className="font-mono text-[8px] uppercase tracking-widest text-[#6edba8] block font-semibold -mt-0.5">My Bookings</span>
+            </div>
           </div>
         </button>
         
@@ -175,6 +182,7 @@ export default function BookingDetailPage({
           >
             New Reservation
           </button>
+        </div>
         </div>
       </header>
 
