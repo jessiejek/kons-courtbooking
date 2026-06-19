@@ -623,6 +623,12 @@ export default function CheckoutPage({
 
             {/* Core Authorization Action Button */}
             <div>
+              {!phoneNumber.trim() && (
+                <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700 font-medium flex gap-2 items-center">
+                  <Phone className="w-3.5 h-3.5 shrink-0" />
+                  <span>Please enter your <strong>mobile number</strong> in Step 1 before submitting.</span>
+                </div>
+              )}
               {bookingError && (
                 <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium flex gap-2 items-start">
                   <span className="shrink-0">⚠</span>
