@@ -42,11 +42,35 @@ function fmtTime(t: string) {
 
 function toH(t: string) { return parseInt(t.split(':')[0]); }
 
+interface PricingRange { start: number; end: number; rate: number; }
+
+// Returns the hourly rate for a given hour based on global pricing ranges
+function getRateForHour(h: number, ranges: PricingRange[], fallback: number): number {
+  for (const r of ranges) {
+    if (r.start <= r.end) {
+      if (h >= r.start && h < r.end) return r.rate;
+    } else {
+      // overnight range e.g. 23:00–06:00
+      if (h >= r.start || h < r.end) return r.rate;
+    }
+  }
+  return fallback;
+}
+
+function calcAmount(startH: number, endH: number, ranges: PricingRange[], fallback: number): number {
+  let total = 0;
+  for (let h = startH; h < endH; h++) {
+    total += getRateForHour(h, ranges, fallback);
+  }
+  return total;
+}
+
 export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinViewProps) {
   const today = new Date().toISOString().split('T')[0];
   const [viewDate, setViewDate] = useState(today);
   const [allBookings, setAllBookings] = useState<(SlotBooking & { court_id: number })[]>([]);
   const [loading, setLoading] = useState(false);
+  const [globalRates, setGlobalRates] = useState<PricingRange[]>([]);
 
   // Per-court slot selection: courtId → selected hour strings
   const [courtSelections, setCourtSelections] = useState<Record<number, string[]>>({});
@@ -61,7 +85,27 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
   const [nbPayment, setNbPayment] = useState<'cash' | 'gcash'>('cash');
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    loadGlobalRates();
+  }, []);
+
   useEffect(() => { loadSchedule(); }, [viewDate]);
+
+  const loadGlobalRates = async () => {
+    if (!isSupabaseEnabled || !supabase) return;
+    const { data } = await supabase
+      .from('court_pricing')
+      .select('start_time, end_time, rate')
+      .is('court_id', null)
+      .order('start_time');
+    if (data && data.length > 0) {
+      setGlobalRates(data.map((r: any) => ({
+        start: toH(r.start_time),
+        end: toH(r.end_time),
+        rate: Number(r.rate),
+      })));
+    }
+  };
 
   const loadSchedule = async () => {
     if (!isSupabaseEnabled || !supabase) return;
@@ -138,7 +182,7 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
       const durationH = endH - startH;
       setNbStart(`${startH.toString().padStart(2, '0')}:00`);
       setNbEnd(`${endH.toString().padStart(2, '0')}:00`);
-      setNbAmount(durationH * (court.defaultPrice ?? 300));
+      setNbAmount(calcAmount(startH, endH, globalRates, court.defaultPrice ?? 300));
     } else {
       setNbStart('09:00');
       setNbEnd('10:00');
@@ -368,7 +412,7 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                           {durationH}h · {fmtTime(startStr)} – {fmtTime(endStr)}
                         </span>
                         <span className="text-sm font-extrabold text-on-surface bg-white border border-outline-variant/50 rounded-lg px-3 py-1">
-                          ₱{(durationH * (court.defaultPrice ?? 300)).toLocaleString()}
+                          ₱{calcAmount(startH, endH, globalRates, court.defaultPrice ?? 300).toLocaleString()}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
