@@ -153,8 +153,11 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
     return h === minH - 1 || h === maxH + 1 || sel.includes(hour);
   };
 
+  const isPastHour = (hour: string) => viewDate === today && toH(hour) < nowH;
+
   const handleSlotClick = (courtId: number, hour: string, booked: boolean) => {
     if (booked) return;
+    if (isPastHour(hour)) return;
     const sel = getSelectedForCourt(courtId);
     if (!isSlotSelectable(courtId, hour)) return;
 
@@ -336,17 +339,23 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                     {HOURS.map(hour => {
                       const booking = isHourBooked(bookings, hour);
                       const isCurrentHour = toH(hour) === nowH && viewDate === today;
+                      const past = isPastHour(hour);
                       const isSelected = sel.includes(hour);
-                      const selectable = !booking && isSlotSelectable(court.id, hour);
+                      const selectable = !booking && !past && isSlotSelectable(court.id, hour);
                       const isWalkin = booking?.is_walkin;
-                      const nonContiguous = !booking && !isSelected && !selectable;
+                      const nonContiguous = !booking && !past && !isSelected && !selectable;
 
                       let cellClass = '';
                       let hourLabelClass = '';
                       let subText = '';
                       let subClass = '';
 
-                      if (booking) {
+                      if (past && !booking) {
+                        cellClass = 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-40';
+                        hourLabelClass = 'text-slate-400 line-through';
+                        subText = 'past';
+                        subClass = 'text-slate-300 text-[10px]';
+                      } else if (booking) {
                         cellClass = isWalkin
                           ? 'bg-amber-50 border-amber-300 cursor-default'
                           : 'bg-[#e8f5ee] border-[#9FE1CB] cursor-default';
