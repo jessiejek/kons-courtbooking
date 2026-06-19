@@ -150,8 +150,7 @@ export default function CheckoutPage({
   const hoursCount = effectiveSlots.length;
   const courtPrice = (isDemo ? null : finalPriceProp) ?? hoursCount * effectiveCourt.pricePerHour;
   const loyaltySavings = 0; // already applied in BookingSelector finalPrice
-  const processingFee = paymentMethod === 'Card' ? 25 : 0;
-  const totalDue = Math.max(0, courtPrice + processingFee);
+  const totalDue = Math.max(0, courtPrice);
 
   const formatTimer = (sec: number) => {
     const m = Math.floor(sec / 60);
@@ -747,15 +746,6 @@ export default function CheckoutPage({
                   <span className="font-mono text-slate-900">₱{courtPrice}</span>
                 </div>
 
-                <div className="flex justify-between">
-                  <span>Carbon Paddles Selection</span>
-                  <span className="font-mono text-emerald-600 uppercase font-black">Free</span>
-                </div>
-
-                <div className="flex justify-between">
-                  <span>Processing Gateway Surcharge</span>
-                  <span className="font-mono text-slate-900">₱{processingFee}</span>
-                </div>
 
                 <div className="flex justify-between text-slate-900 pt-3 border-t border-slate-100 text-sm font-bold">
                   <span>Total Amount Due</span>
