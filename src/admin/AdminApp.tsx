@@ -186,7 +186,8 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
       defaultPrice: Number(row.default_price ?? 300),
       status: row.status ?? 'active',
       pricing: {},
-    })));
+      imageUrl: row.image_url ?? '',
+    } as any)));
   };
 
   const loadBookings = async () => {
@@ -207,6 +208,7 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
       surface_type: court.surfaceType,
       default_price: court.defaultPrice,
       status: court.status,
+      image_url: (court as any).imageUrl ?? null,
     };
     if (!isSupabaseEnabled || !supabase) {
       setCourts(prev => prev.some(c => c.id === court.id) ? prev.map(c => c.id === court.id ? court : c) : [...prev, court]);

@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import {
   ArrowLeft,
   Clock,
@@ -10,11 +10,14 @@ import {
   Hammer,
   EyeOff,
   Loader2,
+  ImagePlus,
+  X,
 } from 'lucide-react';
 import { Court, CourtStatus, CourtSurface, DayOfWeek } from '../types';
 import { createDefaultPricingForDay } from '../data';
 import { useToast, ToastContainer } from '../../components/Toast';
 import ConfirmModal, { ConfirmOptions } from '../../components/ConfirmModal';
+import { supabase, isSupabaseEnabled } from '../../lib/supabase';
 
 interface AddEditCourtViewProps {
   editCourtId: number | 'new' | null;
@@ -54,18 +57,35 @@ export default function AddEditCourtView({
       setClosesAt(existingCourt.closesAt);
       setDefaultPrice(existingCourt.defaultPrice);
       setStatus(existingCourt.status);
+      setImageUrl((existingCourt as any).imageUrl ?? '');
     } else {
-      // Default initial states for 'new'
       setName('');
       setSurfaceType('indoor');
       setOpensAt('06:00');
       setClosesAt('22:00');
       setDefaultPrice(300);
       setStatus('active');
+      setImageUrl('');
     }
   }, [existingCourt, editCourtId]);
 
+  const [imageUrl, setImageUrl] = useState('');
+  const [imageUploading, setImageUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const handleImageUpload = async (file: File) => {
+    if (!isSupabaseEnabled || !supabase) return;
+    setImageUploading(true);
+    const ext = file.name.split('.').pop();
+    const path = `court-${existingCourt?.id ?? Date.now()}-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from('court-images').upload(path, file, { upsert: true });
+    if (error) { toast('error', 'Upload failed', error.message); setImageUploading(false); return; }
+    const { data } = supabase.storage.from('court-images').getPublicUrl(path);
+    setImageUrl(data.publicUrl);
+    setImageUploading(false);
+    toast('success', 'Image uploaded');
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -92,7 +112,8 @@ export default function AddEditCourtView({
       defaultPrice: Number(defaultPrice),
       status,
       pricing: initialPricing,
-    };
+      imageUrl,
+    } as any;
 
     setIsSaving(true);
     const err = await onSaveCourt(updatedCourt);
@@ -185,6 +206,54 @@ export default function AddEditCourtView({
                 <option value="indoor">Indoor</option>
                 <option value="outdoor">Outdoor</option>
               </select>
+            </div>
+          </div>
+        </section>
+
+        {/* SECTION: COURT IMAGE */}
+        <section className="bg-white border border-outline-variant p-6 rounded-xl shadow-sm space-y-4">
+          <h3 className="text-xs font-bold text-outline uppercase tracking-widest border-b border-outline-variant/30 pb-2">
+            Court Photo
+          </h3>
+          <div className="flex items-start gap-5">
+            {/* Preview */}
+            <div className="w-36 h-28 rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low/40 overflow-hidden shrink-0 flex items-center justify-center">
+              {imageUrl
+                ? <img src={imageUrl} alt="court" className="w-full h-full object-cover" />
+                : <ImagePlus className="w-8 h-8 text-outline/40" />
+              }
+            </div>
+            <div className="space-y-3 flex-1">
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Upload a photo of this court. Used in the customer booking page and booking summary. JPG, PNG or WEBP, max 5MB.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={imageUploading}
+                  className="flex items-center gap-2 text-xs font-bold border border-primary/30 text-primary hover:bg-primary/5 px-4 py-2 rounded-lg transition-all disabled:opacity-50"
+                >
+                  {imageUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />}
+                  {imageUploading ? 'Uploading…' : imageUrl ? 'Replace photo' : 'Upload photo'}
+                </button>
+                {imageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setImageUrl('')}
+                    className="flex items-center gap-1.5 text-xs font-bold text-red-500 hover:bg-red-50 border border-red-200 px-3 py-2 rounded-lg transition-all"
+                  >
+                    <X className="w-3.5 h-3.5" /> Remove
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </section>

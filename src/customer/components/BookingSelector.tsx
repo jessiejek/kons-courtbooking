@@ -6,7 +6,7 @@ import { useRealtimeSlots } from '../../hooks/useRealtimeSlots';
 import { isSupabaseEnabled, supabase } from '../../lib/supabase';
 
 interface PricingRange { start: string; end: string; rate: number; courtId: number | null; }
-interface CourtMeta { dbId: number; useGlobal: boolean; defaultPrice: number; name: string; surfaceType: string; status: string; }
+interface CourtMeta { dbId: number; useGlobal: boolean; defaultPrice: number; name: string; surfaceType: string; status: string; imageUrl: string; }
 
 // Returns the applicable rate for a given time slot from loaded pricing ranges
 const getRateForSlot = (
@@ -143,14 +143,14 @@ export default function BookingSelector({
   useEffect(() => {
     if (!isSupabaseEnabled || !supabase) return;
     const load = async () => {
-      const { data: courts } = await supabase.from('courts').select('id, slug, name, surface_type, default_price, use_global_pricing, status').neq('status', 'inactive');
+      const { data: courts } = await supabase.from('courts').select('id, slug, name, surface_type, default_price, use_global_pricing, status, image_url').neq('status', 'inactive');
       const { data: pricing } = await supabase.from('court_pricing').select('court_id, start_time, end_time, rate');
 
       if (courts) {
         const meta: Record<string, CourtMeta> = {};
         const slugs: string[] = [];
         courts.forEach((c: any) => {
-          meta[c.slug] = { dbId: c.id, useGlobal: c.use_global_pricing ?? true, defaultPrice: Number(c.default_price), name: c.name, surfaceType: c.surface_type ?? '', status: c.status ?? 'active' };
+          meta[c.slug] = { dbId: c.id, useGlobal: c.use_global_pricing ?? true, defaultPrice: Number(c.default_price), name: c.name, surfaceType: c.surface_type ?? '', status: c.status ?? 'active', imageUrl: c.image_url ?? '' };
           slugs.push(c.slug);
         });
         setCourtMeta(meta);
@@ -495,7 +495,7 @@ export default function BookingSelector({
               {/* Court Spotlight Detail */}
               <div className="bg-[#f0f4f1] text-[#1a1c1b] p-4 rounded-xl border border-[#bccac1] flex flex-col md:flex-row gap-4 items-center mt-4">
                 <img
-                  src={selectedCourt.image}
+                  src={courtMeta[selectedCourtId]?.imageUrl || selectedCourt.image}
                   alt={selectedCourt.name}
                   className="w-full md:w-28 h-20 object-cover rounded-lg shrink-0"
                   referrerPolicy="no-referrer"
@@ -644,9 +644,9 @@ export default function BookingSelector({
 
             {/* Selected Court Block representation */}
             <div className="flex gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-              <img 
-                src={selectedCourt.image} 
-                alt={selectedCourt.name} 
+              <img
+                src={courtMeta[selectedCourtId]?.imageUrl || selectedCourt.image}
+                alt={selectedCourt.name}
                 className="w-14 h-14 object-cover rounded-md border border-slate-200/60 shrink-0"
                 referrerPolicy="no-referrer"
               />
