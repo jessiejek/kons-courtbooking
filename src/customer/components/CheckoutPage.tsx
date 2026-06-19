@@ -93,12 +93,20 @@ export default function CheckoutPage({
     : selectedCourt;
   const effectiveDate = isDemo ? new Date().toISOString().split('T')[0] : selectedDate;
 
-  // Pre-fill guest details from logged-in user
+  // Pre-fill guest details from logged-in user + saved phone from profile
   useEffect(() => {
-    if (currentUser) {
-      setFullName(currentUser.name);
-      setEmail(currentUser.email);
-      setIsSocialLoggedIn(true);
+    if (!currentUser) return;
+    setFullName(currentUser.name);
+    setEmail(currentUser.email);
+    setIsSocialLoggedIn(true);
+    // Load saved phone from profiles table
+    if (isSupabaseEnabled && supabase) {
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (!user) return;
+        supabase!.from('profiles').select('phone').eq('id', user.id).single().then(({ data }) => {
+          if (data?.phone) setPhoneNumber(data.phone);
+        });
+      });
     }
   }, [currentUser]);
 
@@ -264,6 +272,13 @@ export default function CheckoutPage({
     }
 
     await releaseHolds();
+
+    // Save phone number to profile for next time
+    if (isSupabaseEnabled && supabase && phoneNumber.trim()) {
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) supabase!.from('profiles').upsert({ id: user.id, phone: phoneNumber.trim() }, { onConflict: 'id' });
+      });
+    }
 
     // Notify admins of new payment submission
     notifyPaymentSubmitted({
