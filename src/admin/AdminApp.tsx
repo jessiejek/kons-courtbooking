@@ -110,11 +110,47 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
   const [nbStatus, setNbStatus] = useState<BookingStatus>('confirmed');
   const [nbAmount, setNbAmount] = useState(300);
   const [nbPaymentMethod, setNbPaymentMethod] = useState<'cash' | 'gcash'>('cash');
+  const [adminGlobalRates, setAdminGlobalRates] = useState<{ start: number; end: number; rate: number }[]>([]);
 
   useEffect(() => {
     loadCourts();
     loadBookings();
+    loadAdminGlobalRates();
   }, []);
+
+  // Recalculate amount whenever court, start, or end time changes
+  useEffect(() => {
+    const startH = parseInt(nbTime.split(':')[0]);
+    const endH = parseInt(nbEndTime.split(':')[0]);
+    if (endH <= startH) return;
+    const court = courts.find(c => c.id === nbCourtId) ?? courts[0];
+    const fallback = court?.defaultPrice ?? 300;
+    let total = 0;
+    for (let h = startH; h < endH; h++) {
+      const rate = adminGlobalRates.find(r => {
+        if (r.start <= r.end) return h >= r.start && h < r.end;
+        return h >= r.start || h < r.end;
+      })?.rate ?? fallback;
+      total += rate;
+    }
+    setNbAmount(total);
+  }, [nbTime, nbEndTime, nbCourtId, adminGlobalRates, courts]);
+
+  const loadAdminGlobalRates = async () => {
+    if (!isSupabaseEnabled || !supabase) return;
+    const { data } = await supabase
+      .from('court_pricing')
+      .select('start_time, end_time, rate')
+      .is('court_id', null)
+      .order('start_time');
+    if (data && data.length > 0) {
+      setAdminGlobalRates(data.map((r: any) => ({
+        start: parseInt(r.start_time),
+        end: parseInt(r.end_time),
+        rate: Number(r.rate),
+      })));
+    }
+  };
 
   const loadCourts = async () => {
     if (!isSupabaseEnabled || !supabase) { setCourts(defaultCourts); return; }
