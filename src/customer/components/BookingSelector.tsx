@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Calendar as CalendarIcon, Clock, ShieldCheck, HelpCircle, ChevronLeft, ChevronRight, Info, AlertTriangle } from 'lucide-react';
 import { Court, TimeSlot } from '../types';
 import { COURTS as STATIC_COURTS, TIME_SLOTS_RAW } from '../data';
@@ -137,7 +137,9 @@ export default function BookingSelector({
   const [pricingRanges, setPricingRanges] = useState<PricingRange[]>([]);
   const [courtMeta, setCourtMeta] = useState<Record<string, CourtMeta>>({});
   const [activeSlugs, setActiveSlugs] = useState<string[]>([]);
+  const dateInputRef = useRef<HTMLInputElement>(null);
   const sliderDates = getDatesSlider();
+  const isCustomDate = !sliderDates.some(d => d.dateStr === selectedDate);
 
   // Load courts + pricing from Supabase
   useEffect(() => {
@@ -409,25 +411,42 @@ export default function BookingSelector({
                   );
                 })}
 
-                {/* Calendar Input Accessory */}
-                <div className="relative flex items-center justify-center min-w-[70px] shrink-0 border border-dashed border-slate-300 hover:border-slate-800 rounded-xl bg-slate-50 overflow-hidden">
-                  <label className="flex flex-col items-center justify-center w-full h-full p-2 text-center cursor-pointer text-slate-500 hover:text-slate-900">
-                    <CalendarIcon className="w-5 h-5 text-slate-400 mb-1" />
-                    <span className="text-[9px] font-mono font-medium uppercase">Custom</span>
-                    <input
-                      type="date"
-                      value={selectedDate}
-                      min={new Date().toISOString().split('T')[0]}
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          setSelectedDate(e.target.value);
-                          clearSelection();
-                        }
-                      }}
-                      className="absolute inset-0 opacity-0 cursor-pointer pointer-events-auto"
-                    />
-                  </label>
-                </div>
+                {/* Custom date chip — shown when a date outside the 5-day slider is selected */}
+                {isCustomDate && (() => {
+                  const d = new Date(selectedDate + 'T00:00:00');
+                  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+                  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                  return (
+                    <div className="flex flex-col items-center justify-center p-3.5 rounded-xl border min-w-[70px] shrink-0 bg-[#00694c] border-[#00694c] text-white shadow-md">
+                      <span className="text-[10px] font-mono tracking-wider font-semibold uppercase text-[#6edba8]">{days[d.getDay()]}</span>
+                      <span className="text-xl font-black font-sans leading-none mt-1">{d.getDate()}</span>
+                      <span className="text-[9px] font-mono mt-1 opacity-70">{months[d.getMonth()]}</span>
+                    </div>
+                  );
+                })()}
+
+                {/* Calendar picker button */}
+                <button
+                  type="button"
+                  onClick={() => dateInputRef.current?.showPicker()}
+                  className="relative flex flex-col items-center justify-center p-3.5 rounded-xl border min-w-[70px] shrink-0 border-dashed border-slate-300 hover:border-[#00694c] bg-slate-50 hover:bg-[#00694c]/5 text-slate-500 hover:text-[#00694c] transition-all cursor-pointer"
+                >
+                  <CalendarIcon className="w-5 h-5 mb-1" />
+                  <span className="text-[9px] font-mono font-medium uppercase">Pick date</span>
+                  <input
+                    ref={dateInputRef}
+                    type="date"
+                    value={selectedDate}
+                    min={new Date().toISOString().split('T')[0]}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setSelectedDate(e.target.value);
+                        clearSelection();
+                      }
+                    }}
+                    className="absolute inset-0 opacity-0 w-0 h-0 pointer-events-none"
+                  />
+                </button>
               </div>
             </div>
 
