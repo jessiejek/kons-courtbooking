@@ -133,10 +133,13 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
     setNbCourtId(courtId);
     if (sel.length > 0) {
       const startH = toH(sel[0]);
-      const endH = toH(sel[sel.length - 1]) + 1;
+      // last selected cell IS the end time (1PM–4PM highlighted = booking until 4PM)
+      const lastH = toH(sel[sel.length - 1]);
+      const endH = lastH === startH ? startH + 1 : lastH;
+      const durationH = endH - startH;
       setNbStart(`${startH.toString().padStart(2, '0')}:00`);
       setNbEnd(`${endH.toString().padStart(2, '0')}:00`);
-      setNbAmount(sel.length * (court.defaultPrice ?? 300));
+      setNbAmount(durationH * (court.defaultPrice ?? 300));
     } else {
       setNbStart('09:00');
       setNbEnd('10:00');
@@ -324,22 +327,18 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                         subClass = 'text-on-surface-variant/60 text-[10px]';
                       }
 
-                      const nextHour = `${(toH(hour) + 1).toString().padStart(2, '0')}:00`;
                       return (
                         <div
                           key={hour}
                           onClick={() => handleSlotClick(court.id, hour, !!booking)}
-                          title={booking ? `${booking.customer_name} · ${fmtTime(booking.start_time)}–${fmtTime(booking.end_time)}` : selectable ? `Select ${fmtHour(hour)}–${fmtHour(nextHour)}` : ''}
-                          className={`flex flex-col items-center justify-center rounded-xl text-center w-[76px] py-3 px-1 border-2 transition-all duration-100 select-none ${cellClass}`}
+                          title={booking ? `${booking.customer_name} · ${fmtTime(booking.start_time)}–${fmtTime(booking.end_time)}` : selectable ? `Click to select ${fmtHour(hour)}` : ''}
+                          className={`flex flex-col items-center justify-center rounded-xl text-center w-[72px] py-3.5 px-1 border-2 transition-all duration-100 select-none ${cellClass}`}
                         >
-                          <span className={`text-[11px] font-bold block leading-tight ${hourLabelClass}`}>
+                          <span className={`text-[12px] font-bold block leading-tight ${hourLabelClass}`}>
                             {fmtHour(hour)}
                           </span>
-                          <span className={`text-[10px] block leading-tight ${isSelected ? 'text-white/70' : 'text-on-surface-variant/50'}`}>
-                            –{fmtHour(nextHour)}
-                          </span>
-                          <span className={`mt-0.5 block truncate max-w-[68px] leading-tight ${subClass}`}>
-                            {booking ? booking.customer_name.split(' ')[0] : isSelected ? 'selected' : isCurrentHour && !booking ? 'now·open' : !booking ? 'open' : ''}
+                          <span className={`mt-1 block truncate max-w-[64px] leading-tight ${subClass}`}>
+                            {booking ? booking.customer_name.split(' ')[0] : isSelected ? 'selected' : isCurrentHour ? 'now · open' : 'open'}
                           </span>
                           {booking && (
                             <span className={`text-[9px] mt-0.5 capitalize ${isWalkin ? 'text-amber-500' : 'text-[#00694c]/70'}`}>
@@ -353,33 +352,42 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                 </div>
 
                 {/* Selection action bar */}
-                {hasSelection && !isMaintenance && (
-                  <div className="mx-5 mb-4 bg-primary/5 border border-primary/25 rounded-xl px-5 py-3 flex items-center justify-between">
-                    <div>
-                      <span className="text-sm text-primary font-bold">
-                        {sel.length} hour{sel.length !== 1 ? 's' : ''} selected
-                      </span>
-                      <span className="text-sm text-primary/70 ml-2 font-mono">
-                        {fmtTime(sel.sort()[0])} – {fmtTime(`${(toH(sel.sort()[sel.length - 1]) + 1).toString().padStart(2, '0')}:00`)}
-                      </span>
+                {hasSelection && !isMaintenance && (() => {
+                  const sorted = sel.sort();
+                  const startH = toH(sorted[0]);
+                  const lastH = toH(sorted[sorted.length - 1]);
+                  const endH = lastH === startH ? startH + 1 : lastH;
+                  const durationH = endH - startH;
+                  const startStr = `${startH.toString().padStart(2, '0')}:00`;
+                  const endStr = `${endH.toString().padStart(2, '0')}:00`;
+                  return (
+                    <div className="mx-5 mb-4 bg-primary/5 border border-primary/25 rounded-xl px-5 py-3 flex items-center justify-between">
+                      <div>
+                        <span className="text-sm text-primary font-bold">
+                          {durationH} hour{durationH !== 1 ? 's' : ''} selected
+                        </span>
+                        <span className="text-sm text-primary/70 ml-2 font-mono">
+                          {fmtTime(startStr)} – {fmtTime(endStr)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setCourtSelections(prev => ({ ...prev, [court.id]: [] }))}
+                          className="text-xs text-on-surface-variant hover:text-on-surface underline px-2 py-1"
+                        >
+                          Clear
+                        </button>
+                        <button
+                          onClick={() => openFormForCourt(court.id)}
+                          className="flex items-center gap-1.5 bg-primary text-white text-sm font-bold px-5 py-2.5 rounded-lg shadow-md hover:opacity-90 transition-all"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add walk-in ({durationH}h)
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setCourtSelections(prev => ({ ...prev, [court.id]: [] }))}
-                        className="text-xs text-on-surface-variant hover:text-on-surface underline px-2 py-1"
-                      >
-                        Clear
-                      </button>
-                      <button
-                        onClick={() => openFormForCourt(court.id)}
-                        className="flex items-center gap-1.5 bg-primary text-white text-sm font-bold px-5 py-2.5 rounded-lg shadow-md hover:opacity-90 transition-all"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Add walk-in ({sel.length}h)
-                      </button>
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Booking pills */}
                 {bookings.length > 0 && (
