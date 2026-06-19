@@ -324,10 +324,13 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
       setBookings(prev =>
         prev.map((b) =>
           b.bookingId === row.booking_ref
-            ? { ...b, status: row.booking_status as BookingStatus }
+            ? { ...b, status: row.booking_status as BookingStatus, paymentStatus: row.payment_status ?? (b as any).paymentStatus }
             : b
         )
       );
+    },
+    onDelete: (row) => {
+      setBookings(prev => prev.filter(b => b.bookingId !== row.booking_ref));
     },
   });
 
