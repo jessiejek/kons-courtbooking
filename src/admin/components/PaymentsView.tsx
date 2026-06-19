@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { CheckCircle, XCircle, Clock, RefreshCw, ImageIcon, ExternalLink } from 'lucide-react';
 import { supabase, isSupabaseEnabled } from '../../lib/supabase';
+import { notifyBookingConfirmed, notifyBookingDeclined } from '../../lib/notifications';
 
 interface PaymentRow {
   id: number;
@@ -75,6 +76,11 @@ export default function PaymentsView({ toast, onPaymentActioned }: Props) {
     setActing(null);
     if (error) { toast('error', 'Failed to approve', error.message); return; }
     toast('success', 'Payment approved', `${p.customerName} — ${p.courtName} confirmed.`);
+    notifyBookingConfirmed({
+      bookingRef: p.bookingRef, courtName: p.courtName,
+      customerEmail: p.customerEmail ?? '', customerName: p.customerName,
+      date: p.bookingDate, startTime: p.startTime, endTime: p.endTime,
+    });
     setPayments(prev => prev.filter(x => x.bookingRef !== p.bookingRef));
     onPaymentActioned();
   };
@@ -90,6 +96,11 @@ export default function PaymentsView({ toast, onPaymentActioned }: Props) {
     setActing(null);
     if (e1 || e2) { toast('error', 'Failed to decline', (e1 ?? e2)?.message); return; }
     toast('warning', 'Payment declined', `${p.customerName}'s booking has been cancelled.`);
+    notifyBookingDeclined({
+      bookingRef: p.bookingRef, courtName: p.courtName,
+      customerEmail: p.customerEmail ?? '', customerName: p.customerName,
+      date: p.bookingDate, startTime: p.startTime, endTime: p.endTime,
+    });
     setPayments(prev => prev.filter(x => x.bookingRef !== p.bookingRef));
     onPaymentActioned();
   };

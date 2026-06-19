@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, Mail, Phone, User, Lock, ArrowRight, AlertTriangle, Check, Upload, X, ImageIcon } from 'lucide-react';
 import { Court, Booking } from '../types';
 import { supabase, isSupabaseEnabled } from '../../lib/supabase';
+import { notifyPaymentSubmitted } from '../../lib/notifications';
 
 interface CheckoutPageProps {
   onNavigate: (screen: 'landing' | 'booking' | 'checkout' | 'confirmed' | 'bookings-list' | 'booking-detail') => void;
@@ -263,6 +264,17 @@ export default function CheckoutPage({
     }
 
     await releaseHolds();
+
+    // Notify admins of new payment submission
+    notifyPaymentSubmitted({
+      bookingRef: finalBookingId,
+      courtName: effectiveCourt.name,
+      customerEmail: email,
+      customerName: fullName,
+      date: effectiveDate,
+      startTime: sorted[0],
+      endTime,
+    });
 
     const newBookingRecord: Booking = {
       id: finalBookingId,
