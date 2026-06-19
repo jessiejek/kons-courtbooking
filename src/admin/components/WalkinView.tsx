@@ -337,7 +337,10 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                           <span className={`text-[12px] font-bold block leading-tight ${hourLabelClass}`}>
                             {fmtHour(hour)}
                           </span>
-                          <span className={`mt-1 block truncate max-w-[64px] leading-tight ${subClass}`}>
+                          <span className={`text-[9px] block leading-tight ${isSelected ? 'text-white/60' : isCurrentHour && !booking ? 'text-amber-500/70' : 'text-on-surface-variant/40'}`}>
+                            ({fmtHour(hour)}–{fmtHour(`${(toH(hour)+1).toString().padStart(2,'0')}:00`)})
+                          </span>
+                          <span className={`mt-0.5 block truncate max-w-[64px] leading-tight ${subClass}`}>
                             {booking ? booking.customer_name.split(' ')[0] : isSelected ? 'selected' : isCurrentHour ? 'now · open' : 'open'}
                           </span>
                           {booking && (
