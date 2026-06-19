@@ -209,6 +209,11 @@ export default function BookingSelector({
     return getBookedStatusForSlot(time, selectedCourtId, selectedDate).isBooked;
   };
 
+  const getSlotStatus = (time: string): 'booked' | 'pending' | 'hold' | null => {
+    if (!isSupabaseEnabled) return isSlotBooked(time) ? 'booked' : null;
+    return realtimeBookedSlots.get(time) ?? null;
+  };
+
   // Cart Hold countdown timer logic
   useEffect(() => {
     if (selectedSlots.length === 0) return;
@@ -567,8 +572,8 @@ export default function BookingSelector({
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
                 {filteredSlots.map((slot) => {
                   const slotBooked = isSlotBooked(slot.time);
-                  const mockInfo = isSupabaseEnabled ? null : getBookedStatusForSlot(slot.time, selectedCourtId, selectedDate);
-                  const bookerLabel = mockInfo?.bookerName ?? 'Booked';
+                  const slotStatus = getSlotStatus(slot.time);
+                  const isPending = slotStatus === 'pending';
                   const isSlotCurrentlySelected = selectedSlots.includes(slot.time);
                   const selectable = !slotBooked && isSlotSelectable(slot.time);
                   const nonContiguous = !slotBooked && !selectable;
@@ -581,7 +586,9 @@ export default function BookingSelector({
                       title={nonContiguous ? 'Select consecutive slots only' : undefined}
                       className={`flex items-center justify-between p-3 rounded-lg border transition-all text-left relative overflow-hidden ${
                         slotBooked
-                          ? 'bg-zinc-100 border-zinc-200 text-slate-400 cursor-not-allowed opacity-60'
+                          ? isPending
+                            ? 'bg-amber-50 border-amber-200 text-amber-700 cursor-not-allowed opacity-80'
+                            : 'bg-zinc-100 border-zinc-200 text-slate-400 cursor-not-allowed opacity-60'
                           : isSlotCurrentlySelected
                             ? 'bg-[#00694c] border-[#00694c] text-white font-bold shadow-md ring-2 ring-[#00694c]/10'
                             : nonContiguous
@@ -593,14 +600,16 @@ export default function BookingSelector({
                         <div className="text-[11px] font-mono leading-none tracking-tight">
                           {slot.label}
                         </div>
-                        <div className="text-[9px] font-mono text-slate-400 mt-1 leading-none">
-                          {slotBooked ? bookerLabel : `₱${getSlotRate(slot.time)}/hr`}
+                        <div className={`text-[9px] font-mono mt-1 leading-none ${isPending ? 'text-amber-600' : 'text-slate-400'}`}>
+                          {slotBooked ? (isPending ? 'Awaiting approval' : 'Booked') : `₱${getSlotRate(slot.time)}/hr`}
                         </div>
                       </div>
 
                       {slotBooked ? (
-                        <span className="text-[9px] font-mono bg-zinc-200 text-zinc-500 px-1.5 py-0.5 rounded font-black uppercase">
-                          Booked
+                        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-black uppercase ${
+                          isPending ? 'bg-amber-100 text-amber-700' : 'bg-zinc-200 text-zinc-500'
+                        }`}>
+                          {isPending ? 'Pending' : 'Booked'}
                         </span>
                       ) : isSlotCurrentlySelected ? (
                         <span className="text-[9px] font-mono bg-[#00694c] text-white px-1.5 py-0.5 rounded font-black uppercase">
