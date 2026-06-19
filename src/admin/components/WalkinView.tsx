@@ -253,7 +253,7 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
           type="date"
           value={viewDate}
           onChange={e => setViewDate(e.target.value)}
-          className="border border-outline-variant rounded-lg px-3 py-2 text-sm font-medium bg-surface focus:border-primary focus:ring-0"
+          className="w-full md:w-auto border border-outline-variant rounded-lg px-3 py-2 text-sm font-medium bg-surface focus:border-primary focus:ring-0"
         />
       </div>
 
@@ -289,6 +289,9 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
             const isOccupiedNow = bookings.some(b => nowH >= toH(b.start_time) && nowH < toH(b.end_time) && viewDate === today);
             const sel = getSelectedForCourt(court.id);
             const hasSelection = sel.length > 0;
+            const isFullyBooked = !isMaintenance && HOURS.every(hour =>
+              isPastHour(hour) || !!isHourBooked(bookings, hour)
+            );
 
             return (
               <div key={court.id} className={`bg-white border rounded-xl overflow-hidden shadow-sm transition-all duration-150 ${
@@ -307,6 +310,9 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                     </span>
                     {isMaintenance && (
                       <span className="text-[10px] font-bold uppercase bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded">maintenance</span>
+                    )}
+                    {isFullyBooked && (
+                      <span className="text-[10px] font-bold uppercase bg-red-100 text-red-700 border border-red-200 px-1.5 py-0.5 rounded">fully booked</span>
                     )}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
@@ -335,7 +341,7 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                 {/* Hour grid — 2 rows of 12, no scroll */}
                 <div className="px-3 py-3 space-y-1.5">
                   {[HOURS_AM, HOURS_PM].map((row, rowIdx) => (
-                  <div key={rowIdx} className="grid grid-cols-12 gap-1">
+                  <div key={rowIdx} className="grid grid-cols-6 sm:grid-cols-12 gap-1">
                     {row.map(hour => {
                       const booking = isHourBooked(bookings, hour);
                       const isCurrentHour = toH(hour) === nowH && viewDate === today;
