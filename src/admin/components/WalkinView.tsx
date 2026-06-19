@@ -42,25 +42,27 @@ function fmtTime(t: string) {
 
 function toH(t: string) { return parseInt(t.split(':')[0]); }
 
-interface PricingRange { start: number; end: number; rate: number; }
+interface PricingRow { courtId: number | null; start: number; end: number; rate: number; }
 
-// Returns the hourly rate for a given hour based on global pricing ranges
-function getRateForHour(h: number, ranges: PricingRange[], fallback: number): number {
-  for (const r of ranges) {
-    if (r.start <= r.end) {
-      if (h >= r.start && h < r.end) return r.rate;
-    } else {
-      // overnight range e.g. 23:00–06:00
-      if (h >= r.start || h < r.end) return r.rate;
-    }
+function getRateForHour(h: number, courtId: number, useGlobal: boolean, allRates: PricingRow[], fallback: number): number {
+  const inRange = (r: PricingRow) => {
+    if (r.start <= r.end) return h >= r.start && h < r.end;
+    return h >= r.start || h < r.end; // overnight
+  };
+  // Use court-specific rates if the court has overrides
+  if (!useGlobal) {
+    const match = allRates.find(r => r.courtId === courtId && inRange(r));
+    if (match) return match.rate;
   }
-  return fallback;
+  // Fall back to global
+  const global = allRates.find(r => r.courtId === null && inRange(r));
+  return global?.rate ?? fallback;
 }
 
-function calcAmount(startH: number, endH: number, ranges: PricingRange[], fallback: number): number {
+function calcAmount(startH: number, endH: number, courtId: number, useGlobal: boolean, allRates: PricingRow[], fallback: number): number {
   let total = 0;
   for (let h = startH; h < endH; h++) {
-    total += getRateForHour(h, ranges, fallback);
+    total += getRateForHour(h, courtId, useGlobal, allRates, fallback);
   }
   return total;
 }
@@ -70,7 +72,8 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
   const [viewDate, setViewDate] = useState(today);
   const [allBookings, setAllBookings] = useState<(SlotBooking & { court_id: number })[]>([]);
   const [loading, setLoading] = useState(false);
-  const [globalRates, setGlobalRates] = useState<PricingRange[]>([]);
+  const [allRates, setAllRates] = useState<PricingRow[]>([]);
+  const [courtUseGlobal, setCourtUseGlobal] = useState<Record<number, boolean>>({});
 
   // Per-court slot selection: courtId → selected hour strings
   const [courtSelections, setCourtSelections] = useState<Record<number, string[]>>({});
@@ -93,17 +96,22 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
 
   const loadGlobalRates = async () => {
     if (!isSupabaseEnabled || !supabase) return;
-    const { data } = await supabase
-      .from('court_pricing')
-      .select('start_time, end_time, rate')
-      .is('court_id', null)
-      .order('start_time');
-    if (data && data.length > 0) {
-      setGlobalRates(data.map((r: any) => ({
+    const [{ data: pricing }, { data: courtFlags }] = await Promise.all([
+      supabase.from('court_pricing').select('court_id, start_time, end_time, rate').order('start_time'),
+      supabase.from('courts').select('id, use_global_pricing'),
+    ]);
+    if (pricing) {
+      setAllRates(pricing.map((r: any) => ({
+        courtId: r.court_id ?? null,
         start: toH(r.start_time),
         end: toH(r.end_time),
         rate: Number(r.rate),
       })));
+    }
+    if (courtFlags) {
+      const map: Record<number, boolean> = {};
+      courtFlags.forEach((c: any) => { map[c.id] = c.use_global_pricing ?? true; });
+      setCourtUseGlobal(map);
     }
   };
 
@@ -182,7 +190,7 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
       const durationH = endH - startH;
       setNbStart(`${startH.toString().padStart(2, '0')}:00`);
       setNbEnd(`${endH.toString().padStart(2, '0')}:00`);
-      setNbAmount(calcAmount(startH, endH, globalRates, court.defaultPrice ?? 300));
+      setNbAmount(calcAmount(startH, endH, court.id, courtUseGlobal[court.id] ?? true, allRates, court.defaultPrice ?? 300));
     } else {
       setNbStart('09:00');
       setNbEnd('10:00');
@@ -412,7 +420,7 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                           {durationH}h · {fmtTime(startStr)} – {fmtTime(endStr)}
                         </span>
                         <span className="text-sm font-extrabold text-on-surface bg-white border border-outline-variant/50 rounded-lg px-3 py-1">
-                          ₱{calcAmount(startH, endH, globalRates, court.defaultPrice ?? 300).toLocaleString()}
+                          ₱{calcAmount(startH, endH, court.id, courtUseGlobal[court.id] ?? true, allRates, court.defaultPrice ?? 300).toLocaleString()}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">

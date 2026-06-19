@@ -110,7 +110,8 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
   const [nbStatus, setNbStatus] = useState<BookingStatus>('confirmed');
   const [nbAmount, setNbAmount] = useState(300);
   const [nbPaymentMethod, setNbPaymentMethod] = useState<'cash' | 'gcash'>('cash');
-  const [adminGlobalRates, setAdminGlobalRates] = useState<{ start: number; end: number; rate: number }[]>([]);
+  const [adminAllRates, setAdminAllRates] = useState<{ courtId: number | null; start: number; end: number; rate: number }[]>([]);
+  const [adminCourtUseGlobal, setAdminCourtUseGlobal] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     loadCourts();
@@ -125,30 +126,43 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
     if (endH <= startH) return;
     const court = courts.find(c => c.id === nbCourtId) ?? courts[0];
     const fallback = court?.defaultPrice ?? 300;
+    const useGlobal = adminCourtUseGlobal[court?.id] ?? true;
     let total = 0;
     for (let h = startH; h < endH; h++) {
-      const rate = adminGlobalRates.find(r => {
+      const inRange = (r: { courtId: number | null; start: number; end: number }) => {
         if (r.start <= r.end) return h >= r.start && h < r.end;
         return h >= r.start || h < r.end;
-      })?.rate ?? fallback;
+      };
+      let rate = fallback;
+      if (!useGlobal) {
+        const match = adminAllRates.find(r => r.courtId === court?.id && inRange(r));
+        if (match) { rate = match.rate; total += rate; continue; }
+      }
+      const global = adminAllRates.find(r => r.courtId === null && inRange(r));
+      rate = global?.rate ?? fallback;
       total += rate;
     }
     setNbAmount(total);
-  }, [nbTime, nbEndTime, nbCourtId, adminGlobalRates, courts]);
+  }, [nbTime, nbEndTime, nbCourtId, adminAllRates, adminCourtUseGlobal, courts]);
 
   const loadAdminGlobalRates = async () => {
     if (!isSupabaseEnabled || !supabase) return;
-    const { data } = await supabase
-      .from('court_pricing')
-      .select('start_time, end_time, rate')
-      .is('court_id', null)
-      .order('start_time');
-    if (data && data.length > 0) {
-      setAdminGlobalRates(data.map((r: any) => ({
+    const [{ data: pricing }, { data: courtFlags }] = await Promise.all([
+      supabase.from('court_pricing').select('court_id, start_time, end_time, rate').order('start_time'),
+      supabase.from('courts').select('id, use_global_pricing'),
+    ]);
+    if (pricing) {
+      setAdminAllRates(pricing.map((r: any) => ({
+        courtId: r.court_id ?? null,
         start: parseInt(r.start_time),
         end: parseInt(r.end_time),
         rate: Number(r.rate),
       })));
+    }
+    if (courtFlags) {
+      const map: Record<number, boolean> = {};
+      courtFlags.forEach((c: any) => { map[c.id] = c.use_global_pricing ?? true; });
+      setAdminCourtUseGlobal(map);
     }
   };
 
