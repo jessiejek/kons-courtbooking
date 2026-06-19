@@ -190,6 +190,15 @@ export default function BookingSelector({
     return getRateForSlot(time, selectedCourtId, pricingRanges, meta.dbId, meta.useGlobal, meta.defaultPrice);
   };
 
+  // Get the rate that applies RIGHT NOW for a given court (for the court card display)
+  const getCurrentRateForCourt = (courtSlug: string): number => {
+    const meta = courtMeta[courtSlug];
+    if (!meta || pricingRanges.length === 0) return meta?.defaultPrice ?? 300;
+    const now = new Date();
+    const currentTime = `${now.getHours().toString().padStart(2, '0')}:00`;
+    return getRateForSlot(currentTime, courtSlug, pricingRanges, meta.dbId, meta.useGlobal, meta.defaultPrice);
+  };
+
   // Live slot availability from Supabase — overrides mock data when connected
   const realtimeBookedSlots = useRealtimeSlots(selectedCourtId, selectedDate);
 
@@ -474,7 +483,7 @@ export default function BookingSelector({
                       <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-200/60 w-full text-[10px] font-mono">
                         {isMaintenance
                           ? <span className="text-amber-500 font-bold">Unavailable</span>
-                          : <span className="font-black text-[#00694c]">₱{courtMeta[court.id]?.defaultPrice ?? court.pricePerHour}/hr</span>
+                          : <span className="font-black text-[#00694c]">₱{getCurrentRateForCourt(court.id)}/hr</span>
                         }
                         <span className="text-slate-400">★ {court.rating}</span>
                       </div>
