@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import CustomerApp from './customer/CustomerApp';
 import AdminApp from './admin/AdminApp';
 import { supabase, isSupabaseEnabled } from './lib/supabase';
@@ -13,12 +13,18 @@ export interface CurrentUser {
 interface RoutesProps {
   role: 'user' | 'admin' | null;
   onLogin: (role: 'user' | 'admin') => void;
-  onLogout: () => void;
+  onLogout: () => Promise<void>;
   currentUser: CurrentUser | null;
 }
 
 function AppRoutes({ role, onLogin, onLogout, currentUser }: RoutesProps) {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await onLogout();
+    navigate('/');
+  };
 
   // Redirect admin → /admin
   if (role === 'admin' && !pathname.startsWith('/admin')) {
@@ -32,10 +38,10 @@ function AppRoutes({ role, onLogin, onLogout, currentUser }: RoutesProps) {
   return (
     <Routes>
       <Route path="/admin/*" element={
-        <AdminApp role={role} onLogin={onLogin} onLogout={onLogout} currentUser={currentUser} />
+        <AdminApp role={role} onLogin={onLogin} onLogout={handleLogout} currentUser={currentUser} />
       } />
       <Route path="*" element={
-        <CustomerApp role={role} onLogin={onLogin} onLogout={onLogout} currentUser={currentUser} />
+        <CustomerApp role={role} onLogin={onLogin} onLogout={handleLogout} currentUser={currentUser} />
       } />
     </Routes>
   );
@@ -82,6 +88,7 @@ export default function App() {
     setRole(null);
     setCurrentUser(null);
   };
+
 
   if (!authReady) return null;
 
