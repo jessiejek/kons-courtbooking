@@ -79,7 +79,7 @@ export default function ConfirmedPage({ onNavigate, booking, onOpenLogin, role, 
 
       <header className="bg-slate-900 text-white py-4 px-6 border-b border-slate-800 sticky top-0 z-40 flex items-center justify-between">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate('landing')}>
-          <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center">
+          <div className="w-7 h-7 rounded-lg bg-[#00694c] flex items-center justify-center">
             <span className="font-black text-white text-sm">S</span>
           </div>
           <span className="font-sans font-black uppercase text-sm tracking-tight">Sunshine Pickleball</span>
@@ -89,7 +89,7 @@ export default function ConfirmedPage({ onNavigate, booking, onOpenLogin, role, 
             <div className="flex items-center gap-2">
               {currentUser?.avatar
                 ? <img src={currentUser.avatar} referrerPolicy="no-referrer" className="w-7 h-7 rounded-full border border-slate-600 object-cover" />
-                : <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-[11px] font-bold">{currentUser?.name?.[0]?.toUpperCase() ?? 'U'}</div>
+                : <div className="w-7 h-7 rounded-full bg-[#00694c] flex items-center justify-center text-white text-[11px] font-bold">{currentUser?.name?.[0]?.toUpperCase() ?? 'U'}</div>
               }
               <span className="text-slate-300 text-xs hidden md:block max-w-[120px] truncate">{currentUser?.name}</span>
               <button onClick={onLogout} className="text-slate-400 hover:text-white py-1 px-2 bg-zinc-800/80 rounded text-xs">Sign out</button>
@@ -104,8 +104,8 @@ export default function ConfirmedPage({ onNavigate, booking, onOpenLogin, role, 
         <div className="max-w-xl w-full text-center space-y-6">
 
           {/* Success badge */}
-          <div className="relative mx-auto w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/20 transform hover:scale-105 transition-transform">
-            <div className="absolute inset-0 rounded-full border border-blue-800 animate-ping opacity-15" />
+          <div className="relative mx-auto w-20 h-20 bg-[#00694c] rounded-full flex items-center justify-center shadow-lg shadow-[#00694c]/20 transform hover:scale-105 transition-transform">
+            <div className="absolute inset-0 rounded-full border border-[#003d2b] animate-ping opacity-15" />
             <Check className="w-10 h-10 text-white" />
           </div>
 
@@ -133,7 +133,7 @@ export default function ConfirmedPage({ onNavigate, booking, onOpenLogin, role, 
                   <span className="text-[10px] font-mono uppercase text-slate-400 block tracking-widest leading-none">ORDER ID</span>
                   <span className="text-md font-mono font-black text-slate-800 mt-1 block">#{details.id}</span>
                 </div>
-                <span className="text-xs bg-blue-50 text-blue-800 border border-blue-200 font-mono font-black px-3 py-1 rounded-full uppercase">
+                <span className="text-xs bg-[#e8f5ee] text-[#003d2b] border border-[#00694c]/30 font-mono font-black px-3 py-1 rounded-full uppercase">
                   Paid
                 </span>
               </div>
@@ -150,7 +150,7 @@ export default function ConfirmedPage({ onNavigate, booking, onOpenLogin, role, 
                 </div>
                 <div>
                   <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest block">BLOCK TIME</span>
-                  <span className="text-xs font-semibold text-blue-700 mt-1 block bg-blue-100 px-2 py-0.5 rounded w-fit">
+                  <span className="text-xs font-semibold text-[#005a40] mt-1 block bg-[#bbead4] px-2 py-0.5 rounded w-fit">
                     {getFormattedTimeLabel(details.startTime)} – {getFormattedTimeLabel(details.endTime)}
                   </span>
                 </div>

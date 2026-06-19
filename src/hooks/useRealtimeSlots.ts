@@ -21,19 +21,29 @@ export function useRealtimeSlots(courtSlug: string, date: string): Set<string> {
   const fetchInitial = useCallback(async () => {
     if (!supabase) return;
 
-    // Join through courts to filter by slug
-    const { data, error } = await supabase
+    // Booked slots
+    const { data: booked } = await supabase
       .from('booking_slots')
       .select('slot_time, courts!inner(slug)')
       .eq('courts.slug', courtSlug)
       .eq('slot_date', date);
 
-    if (error) {
-      console.warn('[useRealtimeSlots] fetch error:', error.message);
-      return;
-    }
+    // Active holds (not expired) for this court+date
+    const { data: courtRow } = await supabase
+      .from('courts').select('id').eq('slug', courtSlug).single();
 
-    setBookedTimes(new Set((data ?? []).map((r: any) => normalize(r.slot_time))));
+    const { data: holds } = courtRow ? await supabase
+      .from('slot_holds')
+      .select('slot_time')
+      .eq('court_id', courtRow.id)
+      .eq('slot_date', date)
+      .gt('expires_at', new Date().toISOString()) : { data: [] };
+
+    const times = new Set<string>([
+      ...(booked ?? []).map((r: any) => normalize(r.slot_time)),
+      ...(holds ?? []).map((r: any) => normalize(r.slot_time)),
+    ]);
+    setBookedTimes(times);
   }, [courtSlug, date]);
 
   useEffect(() => {
@@ -84,11 +94,23 @@ export function useRealtimeSlots(courtSlug: string, date: string): Set<string> {
           });
         }
       )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'slot_holds', filter: `slot_date=eq.${date}` },
+        async (payload) => {
+          const row = payload.new as { court_id: number; slot_time: string };
+          const { data } = await supabase!.from('courts').select('slug').eq('id', row.court_id).single();
+          if (data?.slug === courtSlug) setBookedTimes(prev => new Set([...prev, normalize(row.slot_time)]));
+        }
+      )
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'slot_holds', filter: `slot_date=eq.${date}` },
+        (payload) => {
+          const row = payload.old as { slot_time: string };
+          // Refetch to recalculate — a deleted hold might still have a real booking
+          fetchInitial();
+        }
+      )
       .subscribe();
 
-    return () => {
-      supabase!.removeChannel(channel);
-    };
+    return () => { supabase!.removeChannel(channel); };
   }, [courtSlug, date, fetchInitial]);
 
   return bookedTimes;

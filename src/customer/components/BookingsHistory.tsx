@@ -124,12 +124,12 @@ export default function BookingsHistory({
       {/* Header Bar */}
       <header className="bg-slate-900 text-white py-4 px-6 border-b border-slate-800 sticky top-0 z-40 flex items-center justify-between">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate('landing')}>
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-[#00694c] flex items-center justify-center">
             <span className="font-mono text-white font-extrabold text-[15px]">S</span>
           </div>
           <div>
             <span className="font-sans font-black uppercase text-sm tracking-tight block">Sunshine pickleball</span>
-            <span className="font-mono text-[8px] uppercase tracking-widest text-blue-400 -mt-1 block font-semibold">User Dashboard</span>
+            <span className="font-mono text-[8px] uppercase tracking-widest text-[#6edba8] -mt-1 block font-semibold">User Dashboard</span>
           </div>
         </div>
         
@@ -138,7 +138,7 @@ export default function BookingsHistory({
             <div className="flex items-center gap-2">
               {currentUser?.avatar
                 ? <img src={currentUser.avatar} referrerPolicy="no-referrer" className="w-7 h-7 rounded-full border border-slate-600 object-cover" />
-                : <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-[11px] font-bold">{currentUser?.name?.[0]?.toUpperCase() ?? 'U'}</div>
+                : <div className="w-7 h-7 rounded-full bg-[#00694c] flex items-center justify-center text-white text-[11px] font-bold">{currentUser?.name?.[0]?.toUpperCase() ?? 'U'}</div>
               }
               <span className="text-slate-300 text-xs hidden md:block max-w-[120px] truncate">{currentUser?.name}</span>
               <button onClick={onLogout} className="text-slate-400 hover:text-white py-1 px-2 bg-zinc-800/80 rounded text-xs">Sign out</button>
@@ -150,7 +150,7 @@ export default function BookingsHistory({
           )}
           <button
             onClick={() => onNavigate('booking')}
-            className="bg-blue-600 text-white font-mono font-bold text-xs uppercase px-4 py-2 rounded-lg hover:bg-blue-700 transition-all cursor-pointer"
+            className="bg-[#00694c] text-white font-mono font-bold text-xs uppercase px-4 py-2 rounded-lg hover:bg-[#005a40] transition-all cursor-pointer"
           >
             + Book a court
           </button>
@@ -161,12 +161,12 @@ export default function BookingsHistory({
       <section className="bg-slate-900 text-white py-8 px-6 border-b border-white/5">
         <div className="max-w-7xl w-full mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <span className="text-[10px] bg-blue-500/10 text-blue-300 border border-blue-500/20 font-mono font-bold px-2.5 py-1 rounded-full uppercase">
+            <span className="text-[10px] bg-[#00694c]/10 text-[#6edba8] border border-[#00694c]/20 font-mono font-bold px-2.5 py-1 rounded-full uppercase">
               Authenticated Profile
             </span>
             <h2 className="text-3xl font-sans font-black tracking-tight text-white mt-2 leading-tight flex items-center gap-3">
               My reservations
-              {isFetching && <RefreshCw className="w-5 h-5 text-blue-400 animate-spin" />}
+              {isFetching && <RefreshCw className="w-5 h-5 text-[#6edba8] animate-spin" />}
             </h2>
             <p className="text-xs text-slate-400 mt-1 leading-relaxed">
               Welcome back, {currentUser?.name ?? 'Player'}. Easily track schedules, cancel bookings, or download transaction receipts.
@@ -176,7 +176,7 @@ export default function BookingsHistory({
           <div className="flex gap-3 bg-slate-800/60 p-4 rounded-xl border border-slate-700/50 w-full md:w-auto text-xs">
             <div>
               <span className="block text-[9px] font-mono uppercase text-slate-400">Upcoming Plays</span>
-              <span className="block text-2xl font-black text-blue-400 mt-1">
+              <span className="block text-2xl font-black text-[#6edba8] mt-1">
                 {bookings.filter(b => b.status === 'Upcoming').length} slots
               </span>
             </div>
@@ -220,7 +220,7 @@ export default function BookingsHistory({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by Court Name or Reservation ID..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 text-xs focus:bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all"
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 text-xs focus:bg-white focus:border-[#00694c] focus:ring-1 focus:ring-[#00694c] outline-none transition-all"
             />
           </div>
         </div>
@@ -247,7 +247,7 @@ export default function BookingsHistory({
                     {/* Status Absolute overlay Tag */}
                     <div className="absolute top-3 right-3">
                       {booking.status === 'Upcoming' && (
-                        <span className="text-[10px] bg-blue-50 text-blue-800 font-mono font-black uppercase px-2.5 py-1 rounded-full border border-blue-200 shadow-sm">
+                        <span className="text-[10px] bg-[#e8f5ee] text-[#003d2b] font-mono font-black uppercase px-2.5 py-1 rounded-full border border-[#00694c]/30 shadow-sm">
                           ● Upcoming
                         </span>
                       )}
@@ -295,8 +295,8 @@ export default function BookingsHistory({
                     <span className="text-sm font-mono font-bold text-slate-900 leading-none">₱{booking.price}.00</span>
                   </div>
 
-                  <button className="flex items-center gap-1 font-mono text-xs font-bold uppercase text-blue-600 hover:text-blue-700 hover:underline cursor-pointer">
-                    View Receipt <ChevronRight className="w-4.5 h-4.5 text-blue-600" />
+                  <button className="flex items-center gap-1 font-mono text-xs font-bold uppercase text-[#00694c] hover:text-[#005a40] hover:underline cursor-pointer">
+                    View Receipt <ChevronRight className="w-4.5 h-4.5 text-[#00694c]" />
                   </button>
                 </div>
               </div>
@@ -311,7 +311,7 @@ export default function BookingsHistory({
             </p>
             <button
               onClick={() => onNavigate('booking')}
-              className="px-5 py-2.5 bg-blue-600 text-white font-mono text-xs font-bold uppercase rounded-lg hover:bg-slate-900 hover:text-white transition-all cursor-pointer"
+              className="px-5 py-2.5 bg-[#00694c] text-white font-mono text-xs font-bold uppercase rounded-lg hover:bg-slate-900 hover:text-white transition-all cursor-pointer"
             >
               Start New Booking
             </button>

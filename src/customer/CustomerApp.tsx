@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import { Screen, Booking, Court } from './types';
 import { COURTS } from './data';
@@ -32,7 +32,7 @@ const SCREEN_TO_PATH: Record<Screen, string> = {
 export default function CustomerApp({ role, onLogin, onLogout, currentUser }: Props) {
   const navigate = useNavigate();
 
-  const [selectedDate, setSelectedDate] = useState('2026-10-13');
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [selectedCourtId, setSelectedCourtId] = useState('court-1');
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [cartTimeLeft, setCartTimeLeft] = useState<number>(600);
@@ -41,6 +41,7 @@ export default function CustomerApp({ role, onLogin, onLogout, currentUser }: Pr
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [finalPrice, setFinalPrice] = useState(0);
   const [courtDbId, setCourtDbId] = useState<number | null>(null);
+  const holdSessionId = useRef(crypto.randomUUID()).current;
   // Live courts from Supabase — keyed by slug
   const [liveCourts, setLiveCourts] = useState<Record<string, { name: string; type: string; dbId: number; pricePerHour: number }>>({});
 
@@ -120,6 +121,7 @@ export default function CustomerApp({ role, onLogin, onLogout, currentUser }: Pr
             onCompleteBooking={handleCompleteBooking}
             finalPrice={finalPrice}
             courtDbId={courtDbId}
+            holdSessionId={holdSessionId}
           />
         } />
 

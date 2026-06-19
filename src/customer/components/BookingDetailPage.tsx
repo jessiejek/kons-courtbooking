@@ -113,7 +113,7 @@ export default function BookingDetailPage({
         </p>
         <button
           onClick={() => onNavigate('bookings-list')}
-          className="px-5 py-2.5 bg-blue-600 text-white font-mono text-xs font-bold uppercase rounded-lg hover:bg-blue-700"
+          className="px-5 py-2.5 bg-[#00694c] text-white font-mono text-xs font-bold uppercase rounded-lg hover:bg-[#005a40]"
         >
           View Dashboard
         </button>
@@ -152,7 +152,7 @@ export default function BookingDetailPage({
           <ChevronLeft className="w-5 h-5 text-slate-400 hover:text-white" />
           <div>
             <span className="font-sans font-black uppercase text-sm tracking-tight block">Sunshine pickleball</span>
-            <span className="font-mono text-[8px] uppercase tracking-widest text-blue-400 block font-semibold">User Bookings</span>
+            <span className="font-mono text-[8px] uppercase tracking-widest text-[#6edba8] block font-semibold">User Bookings</span>
           </div>
         </button>
         
@@ -161,7 +161,7 @@ export default function BookingDetailPage({
             <div className="flex items-center gap-2">
               {currentUser?.avatar
                 ? <img src={currentUser.avatar} referrerPolicy="no-referrer" className="w-7 h-7 rounded-full border border-slate-600 object-cover" />
-                : <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-[11px] font-bold">{currentUser?.name?.[0]?.toUpperCase() ?? 'U'}</div>
+                : <div className="w-7 h-7 rounded-full bg-[#00694c] flex items-center justify-center text-white text-[11px] font-bold">{currentUser?.name?.[0]?.toUpperCase() ?? 'U'}</div>
               }
               <span className="text-slate-300 text-xs hidden md:block max-w-[120px] truncate">{currentUser?.name}</span>
               <button onClick={onLogout} className="text-slate-400 hover:text-white py-1 px-2 bg-zinc-800/80 rounded text-xs">Sign out</button>
@@ -171,7 +171,7 @@ export default function BookingDetailPage({
           )}
           <button
             onClick={() => onNavigate('booking')}
-            className="text-white uppercase bg-blue-600 hover:bg-blue-700 font-bold py-1.5 px-4 rounded transition-all cursor-pointer"
+            className="text-white uppercase bg-[#00694c] hover:bg-[#005a40] font-bold py-1.5 px-4 rounded transition-all cursor-pointer"
           >
             New Reservation
           </button>
@@ -197,7 +197,7 @@ export default function BookingDetailPage({
 
               <div className="flex flex-col items-end gap-1.5">
                 {effectiveBooking?.status === 'Upcoming' && (
-                  <span className="text-xs bg-blue-50 text-blue-800 border border-blue-200 font-mono font-black uppercase px-3 py-1.5 rounded-full block text-center min-w-[100px]">
+                  <span className="text-xs bg-[#e8f5ee] text-[#003d2b] border border-[#00694c]/30 font-mono font-black uppercase px-3 py-1.5 rounded-full block text-center min-w-[100px]">
                     ● Scheduled
                   </span>
                 )}
@@ -234,7 +234,7 @@ export default function BookingDetailPage({
                 <div>
                   <span className="font-mono text-[10px] uppercase text-slate-400 tracking-wider">SESSION TIMELINE</span>
                   <p className="font-bold text-slate-800 mt-1">{getReadableSelectedDate(booking.date)}</p>
-                  <p className="text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded w-fit mt-1 block">
+                  <p className="text-xs font-semibold text-[#005a40] bg-[#bbead4] px-2 py-0.5 rounded w-fit mt-1 block">
                     {getFormattedTimeLabel(booking.startTime)} - {getFormattedTimeLabel(booking.endTime)}
                   </p>
                 </div>
@@ -349,7 +349,7 @@ export default function BookingDetailPage({
                   onClick={() => setShowMapModal(true)}
                   className="p-3 bg-slate-900 text-white hover:bg-slate-800 font-mono text-[10px] uppercase font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all outline-none border-none cursor-pointer"
                 >
-                  <MapPin className="w-3.5 h-3.5 text-blue-400" /> Get Directions
+                  <MapPin className="w-3.5 h-3.5 text-[#6edba8]" /> Get Directions
                 </button>
 
                 <button
@@ -411,7 +411,7 @@ export default function BookingDetailPage({
             {/* Receipt invoice branding */}
             <div className="text-center space-y-2 border-b border-slate-100 pb-5">
               <div className="flex items-center justify-center gap-2">
-                <div className="w-7 h-7 rounded bg-blue-600 flex items-center justify-center border border-blue-500/20">
+                <div className="w-7 h-7 rounded bg-[#00694c] flex items-center justify-center border border-[#00694c]/20">
                   <span className="font-mono text-white font-extrabold text-sm">S</span>
                 </div>
                 <span className="font-sans font-black text-slate-900 uppercase tracking-tight text-sm">Sunshine Pickleball Club</span>
@@ -474,7 +474,7 @@ export default function BookingDetailPage({
                 onClick={() => window.print()}
                 className="flex-1 py-3 bg-slate-900 hover:bg-slate-950 text-white font-mono text-xs font-bold uppercase rounded-xl flex items-center justify-center gap-1.5 transition-all outline-none border-none cursor-pointer"
               >
-                <Printer className="w-4 h-4 text-blue-300" /> Trigger Browser Print
+                <Printer className="w-4 h-4 text-[#6edba8]" /> Trigger Browser Print
               </button>
             </div>
           </div>
@@ -493,7 +493,7 @@ export default function BookingDetailPage({
             </button>
 
             <h3 className="font-sans font-black text-slate-900 text-base uppercase tracking-tight flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-blue-600" /> Simulated Geolocation Map
+              <MapPin className="w-5 h-5 text-[#00694c]" /> Simulated Geolocation Map
             </h3>
 
             {/* Mini Map grid mock visual */}
@@ -502,7 +502,7 @@ export default function BookingDetailPage({
               <div className="absolute inset-0 opacity-15 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#1e293b 2px, transparent 2px)', backgroundSize: '24px 24px' }} />
               
               <div className="relative space-y-3 shrink z-10">
-                <div className="w-10 h-10 bg-blue-600 rounded-full border border-blue-800 shadow-md flex items-center justify-center mx-auto text-white">
+                <div className="w-10 h-10 bg-[#00694c] rounded-full border border-[#003d2b] shadow-md flex items-center justify-center mx-auto text-white">
                   <MapPin className="w-5 h-5" />
                 </div>
                 <div className="bg-white/90 backdrop-blur-xs p-3 rounded-xl border border-slate-200/80 max-w-sm">

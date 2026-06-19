@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRealtimeAnnouncements } from '../../hooks/useRealtimeAnnouncements';
+import { COURTS as STATIC_COURTS } from '../data';
+import { supabase, isSupabaseEnabled } from '../../lib/supabase';
 import {
   Calendar, MapPin, Phone, Clock, ArrowRight, ChevronRight,
   Star, Shield, Zap, Users, CheckCircle, Menu, X as XIcon
@@ -14,40 +16,13 @@ interface LandingPageProps {
   currentUser?: { name: string; email: string; avatar?: string; } | null;
 }
 
-const COURTS = [
-  {
-    name: 'Court 1 — Premium Indoor',
-    tag: 'Indoor',
-    price: '₱300/hr',
-    rating: '4.9',
-    desc: 'Climate-controlled with Laykold cushion coating, zero-glare lighting, and tournament-spec nets.',
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAYGSfmdA49eRR83lQsv1hN2gMHr8FG2ikTUmB_75urXgGquTYjSAENgNxTmOIHIy5WRrorIx6XDTt1GqOzxjZS5W--iheKIagmsOqNJF9ovBmYePaCf5F_Aer9lL3rYfbQi3p4SdIf4iLPyk_au1dr7TGCHv2WH1E_0O--uKGrKZ8XJ-8TmVcWpL0MLdqO0U_pevBDCuBKf8PgWtblYvWopZWLFFb6zhLgI-fuOY_n3o21fhIR3dCQ-ecUrX-h9jEroubarcpKg-0g',
-  },
-  {
-    name: 'Court 2 — Championship Outdoor',
-    tag: 'Outdoor',
-    price: '₱250/hr',
-    rating: '4.8',
-    desc: 'Open-air with premium mesh fencing, shadowless stadium lights, and wind-barrier panels.',
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDflRyAyRElrM8rqUnguE6w5PmIDC5BNVKVe0bK2Tvyur65W3kDqeD9BZ37gMDGwOQX7h_lBKS_nX-dCcPP6y9bH1G_4ZKqC3E6EoMnGP2uNZoOHIZ2tkLOd2ATN5Yr4PYQgEi2Kz27JdX571WJW8cicJV0XSV2YkN8djGsENzAwgU2En1WJYx_XW-fuxi3fIgq7eYLjcHnc395c1h8OmQ4xcv5vBh16-2rQJig0A5-uztkWoj8S7Jncfa2geNNzclHKVDu3I6t4pq0',
-  },
-  {
-    name: 'Court 3 — Indoor Pro',
-    tag: 'Indoor',
-    price: '₱300/hr',
-    rating: '4.7',
-    desc: 'Fully ventilated competitive court built for league play. Dynamic cushioning, pro-grade net posts.',
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAUXjgdDHxmwietk7x8EWlEnGVZ3EiJsJnH8HMd7cgeN3KZtYbntZdQhM9FNxlMDfFtJd7A9cePP1Xyl61Z2ejXjjmHmirpO0ig3oHiHBtUZbln_SAeaPVnn_i_rPP1sWqgOpwy3hJB2tGpIraoyS4kJ3FciJVH-b2uigFKyHMSahupCQEZZll4fYMo18UFiqX_0hge5NtUzYCFvJ30DMmxG4J8CNyksJ9z5ppCeVhJ5_wWFuam1bDY0-5LtZndfQqSyoRdQMN1Za0S',
-  },
-  {
-    name: 'Court 4 — Outdoor Scenic',
-    tag: 'Outdoor',
-    price: '₱250/hr',
-    rating: '4.6',
-    desc: 'Lush greenery surround, non-slip textured surface, premium net posts, and night flood lighting.',
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCJZO4uG4ciG-9HvpBeL4KWbg1MCIajfR4-2nvayr6fb-NcRDuvSKdOqcT8c6pcmhvDb2vn_xXmKPcw-t3B5O0eBEsyjTeYof6OqdvY9rI_RDmdN0D0hdxPX6Ng3peqxDDdCQCej3DorIPK9ahXnrrabwnpq1OEEDJ4Rj3dnNublvhAczHk1THJSFdkYTplh3rzIBjkLTftkdQNKJ6BMrw3WCNVUir_Uvyt2grrpYhbnDthy7Um5dHBAUh-kbc3d_aZ_n-SWqc_pPts',
-  },
-];
+interface LiveCourt {
+  slug: string;
+  name: string;
+  surface_type: string;
+  default_price: number;
+  status: string;
+}
 
 const STEPS = [
   { num: '01', title: 'Pick Your Court & Date', desc: 'Browse all four courts, check live availability, and lock in your preferred date in seconds.' },
@@ -65,8 +40,32 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dismissedAnnouncements, setDismissedAnnouncements] = useState<Set<string>>(new Set());
+  const [liveCourts, setLiveCourts] = useState<LiveCourt[]>([]);
   const liveAnnouncements = useRealtimeAnnouncements();
   const visibleAnnouncements = liveAnnouncements.filter((a) => !dismissedAnnouncements.has(a.id));
+
+  useEffect(() => {
+    if (!isSupabaseEnabled || !supabase) return;
+    supabase.from('courts').select('slug, name, surface_type, default_price, status').neq('status', 'inactive').order('id')
+      .then(({ data }) => { if (data) setLiveCourts(data as LiveCourt[]); });
+  }, []);
+
+  // Merge live data over static (for images + ratings which aren't in DB)
+  const COURTS = (liveCourts.length > 0 ? liveCourts : STATIC_COURTS.map(c => ({
+    slug: c.id, name: c.name, surface_type: c.type.toLowerCase(), default_price: c.pricePerHour, status: 'active',
+  }))).map(lc => {
+    const stat = STATIC_COURTS.find(c => c.id === lc.slug) ?? STATIC_COURTS[0];
+    return {
+      slug: lc.slug,
+      name: lc.name,
+      tag: lc.surface_type === 'indoor' ? 'Indoor' : 'Outdoor',
+      price: `₱${lc.default_price}/hr`,
+      rating: stat.rating.toString(),
+      desc: stat.description,
+      img: stat.image,
+      status: lc.status,
+    };
+  });
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 10);
@@ -290,8 +289,8 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
         <div className="relative z-10 bg-black/50 backdrop-blur-md border-t border-white/10">
           <div className="max-w-5xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 divide-x divide-white/10">
             {[
-              { value: '4', label: 'Premium Courts' },
-              { value: '₱250+', label: 'Starting Rate / hr' },
+              { value: COURTS.filter(c => c.status !== 'maintenance').length.toString(), label: 'Active Courts' },
+              { value: `₱${Math.min(...COURTS.map(c => parseInt(c.price.replace(/\D/g, '')))).toLocaleString()}+`, label: 'Starting Rate / hr' },
               { value: '06:00–23:00', label: 'Daily Operations' },
               { value: '500+', label: 'Happy Players / Month' },
             ].map((s) => (
@@ -325,46 +324,63 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {COURTS.map((court) => (
-              <div
-                key={court.name}
-                className="group bg-white rounded-2xl border border-[#e8eeeb] overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-[#00694c]/10 transition-all duration-300 hover:-translate-y-1 cursor-pointer"
-                onClick={() => onNavigate('booking')}
-              >
-                <div className="relative h-48 overflow-hidden">
-                  <img
-                    src={court.img}
-                    alt={court.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                  <span className={`absolute top-3 left-3 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg ${
-                    court.tag === 'Indoor'
-                      ? 'bg-[#00694c] text-white'
-                      : 'bg-white/90 text-[#00694c]'
-                  }`}>
-                    {court.tag}
-                  </span>
-                  <div className="absolute bottom-3 left-3 flex items-center gap-1">
-                    <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                    <span className="text-white text-xs font-bold">{court.rating}</span>
+            {COURTS.map((court) => {
+              const isMaintenance = court.status === 'maintenance';
+              return (
+                <div
+                  key={court.slug}
+                  className={`group bg-white rounded-2xl border overflow-hidden shadow-sm transition-all duration-300 ${
+                    isMaintenance
+                      ? 'border-amber-200 opacity-75 cursor-not-allowed'
+                      : 'border-[#e8eeeb] hover:shadow-2xl hover:shadow-[#00694c]/10 hover:-translate-y-1 cursor-pointer'
+                  }`}
+                  onClick={() => !isMaintenance && onNavigate('booking')}
+                >
+                  <div className="relative h-48 overflow-hidden">
+                    <img
+                      src={court.img}
+                      alt={court.name}
+                      className={`w-full h-full object-cover transition-transform duration-500 ${isMaintenance ? 'grayscale' : 'group-hover:scale-105'}`}
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    {isMaintenance ? (
+                      <span className="absolute top-3 left-3 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-amber-500 text-white">
+                        Maintenance
+                      </span>
+                    ) : (
+                      <span className={`absolute top-3 left-3 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg ${
+                        court.tag === 'Indoor' ? 'bg-[#00694c] text-white' : 'bg-white/90 text-[#00694c]'
+                      }`}>
+                        {court.tag}
+                      </span>
+                    )}
+                    <div className="absolute bottom-3 left-3 flex items-center gap-1">
+                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      <span className="text-white text-xs font-bold">{court.rating}</span>
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-bold text-[#1a1c1b] text-sm leading-tight">{court.name}</h3>
+                      {isMaintenance
+                        ? <span className="shrink-0 text-xs font-extrabold text-amber-500">Unavailable</span>
+                        : <span className="shrink-0 text-xs font-extrabold text-[#00694c]">{court.price}</span>
+                      }
+                    </div>
+                    <p className="text-xs text-[#6d7a73] leading-relaxed">{court.desc}</p>
+                    <div className="pt-1">
+                      {isMaintenance
+                        ? <span className="inline-flex items-center gap-1 text-amber-500 text-xs font-semibold">Under maintenance</span>
+                        : <span className="inline-flex items-center gap-1 text-[#00694c] text-xs font-semibold group-hover:gap-2 transition-all">
+                            Book this court <ChevronRight className="w-3.5 h-3.5" />
+                          </span>
+                      }
+                    </div>
                   </div>
                 </div>
-                <div className="p-4 space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-bold text-[#1a1c1b] text-sm leading-tight">{court.name}</h3>
-                    <span className="shrink-0 text-xs font-extrabold text-[#00694c]">{court.price}</span>
-                  </div>
-                  <p className="text-xs text-[#6d7a73] leading-relaxed">{court.desc}</p>
-                  <div className="pt-1">
-                    <span className="inline-flex items-center gap-1 text-[#00694c] text-xs font-semibold group-hover:gap-2 transition-all">
-                      Book this court <ChevronRight className="w-3.5 h-3.5" />
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>

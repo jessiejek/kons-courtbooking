@@ -69,9 +69,8 @@ const getDatesSlider = () => {
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   
-  // Pivot around Oct 13, 2026, or use real next weeks to align beautifully
-  // Let's seed Oct 11 to Oct 17 to match the exact dates in the screenshot (Oct 13 checkout Oct 13 Tue)
-  const baseDate = new Date('2026-10-11T00:00:00'); 
+  const baseDate = new Date();
+  baseDate.setHours(0, 0, 0, 0);
   
   for (let i = 0; i < 7; i++) {
     const d = new Date(baseDate);
@@ -294,7 +293,7 @@ export default function BookingSelector({
           <ChevronLeft className="w-5 h-5 text-slate-400 hover:text-white" />
           <div>
             <span className="font-sans font-black uppercase text-sm tracking-tight block">Sunshine pickleball</span>
-            <span className="font-mono text-[8px] uppercase tracking-widest text-blue-400 block font-semibold">Reserve Court</span>
+            <span className="font-mono text-[8px] uppercase tracking-widest text-[#6edba8] block font-semibold">Reserve Court</span>
           </div>
         </div>
         
@@ -309,7 +308,7 @@ export default function BookingSelector({
             <div className="flex items-center gap-2">
               {currentUser?.avatar
                 ? <img src={currentUser.avatar} referrerPolicy="no-referrer" className="w-7 h-7 rounded-full border border-slate-600 object-cover" />
-                : <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-[11px] font-bold">{currentUser?.name?.[0]?.toUpperCase() ?? 'U'}</div>
+                : <div className="w-7 h-7 rounded-full bg-[#00694c] flex items-center justify-center text-white text-[11px] font-bold">{currentUser?.name?.[0]?.toUpperCase() ?? 'U'}</div>
               }
               <span className="text-slate-300 text-xs hidden md:block max-w-[120px] truncate">{currentUser?.name}</span>
               <button onClick={onLogout} className="text-slate-400 hover:text-white py-1 px-2 bg-zinc-800/80 rounded text-xs">Sign out</button>
@@ -361,7 +360,7 @@ export default function BookingSelector({
                           : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-800'
                       }`}
                     >
-                      <span className={`text-[10px] font-mono tracking-wider font-semibold uppercase ${isMarkedSelected ? 'text-blue-400' : 'text-slate-500'}`}>
+                      <span className={`text-[10px] font-mono tracking-wider font-semibold uppercase ${isMarkedSelected ? 'text-[#6edba8]' : 'text-slate-500'}`}>
                         {item.dayName}
                       </span>
                       <span className="text-xl font-black font-sans leading-none mt-1">
@@ -429,7 +428,7 @@ export default function BookingSelector({
                         isMaintenance
                           ? 'bg-amber-50 border-amber-200 cursor-not-allowed opacity-70'
                           : isMarkedSelected
-                            ? 'bg-blue-50/70 border-blue-500 shadow-sm transform scale-[1.01] cursor-pointer'
+                            ? 'bg-[#e8f5ee]/70 border-[#00694c] shadow-sm transform scale-[1.01] cursor-pointer'
                             : 'bg-slate-100 hover:bg-slate-250 border-slate-200 cursor-pointer'
                       }`}
                     >
@@ -439,7 +438,7 @@ export default function BookingSelector({
                         </span>
                         {isMaintenance
                           ? <span className="text-[9px] font-mono font-bold uppercase text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">Maintenance</span>
-                          : isMarkedSelected && <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                          : isMarkedSelected && <span className="w-1.5 h-1.5 rounded-full bg-[#00694c]" />
                         }
                       </div>
                       <h4 className={`font-sans font-bold text-xs mt-1 leading-tight shrink-0 ${isMaintenance ? 'text-slate-400' : 'text-slate-900'}`}>
@@ -448,7 +447,7 @@ export default function BookingSelector({
                       <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-200/60 w-full text-[10px] font-mono">
                         {isMaintenance
                           ? <span className="text-amber-500 font-bold">Unavailable</span>
-                          : <span className="font-black text-blue-600">₱{courtMeta[court.id]?.defaultPrice ?? court.pricePerHour}/hr</span>
+                          : <span className="font-black text-[#00694c]">₱{courtMeta[court.id]?.defaultPrice ?? court.pricePerHour}/hr</span>
                         }
                         <span className="text-slate-400">★ {court.rating}</span>
                       </div>
@@ -468,7 +467,7 @@ export default function BookingSelector({
                 <div className="space-y-1 w-full text-center md:text-left">
                   <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
                     <h3 className="font-sans font-extrabold text-sm text-white">{courtMeta[selectedCourtId]?.name || selectedCourt.name}</h3>
-                    <span className="text-[9px] font-mono bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded font-bold uppercase">{courtMeta[selectedCourtId]?.surfaceType || selectedCourt.type} Layout</span>
+                    <span className="text-[9px] font-mono bg-[#00694c]/20 text-[#6edba8] px-1.5 py-0.5 rounded font-bold uppercase">{courtMeta[selectedCourtId]?.surfaceType || selectedCourt.type} Layout</span>
                   </div>
                   <p className="text-xs text-slate-300 leading-relaxed max-w-xl">{selectedCourt.description}</p>
                 </div>
@@ -528,7 +527,7 @@ export default function BookingSelector({
                         slotBooked
                           ? 'bg-zinc-100 border-zinc-200 text-slate-400 cursor-not-allowed opacity-60'
                           : isSlotCurrentlySelected
-                            ? 'bg-blue-600 border-blue-600 text-white font-bold shadow-md ring-2 ring-blue-600/10'
+                            ? 'bg-[#00694c] border-[#00694c] text-white font-bold shadow-md ring-2 ring-[#00694c]/10'
                             : 'bg-white hover:border-slate-800 border-slate-200 text-slate-800 cursor-pointer'
                       }`}
                     >
@@ -565,7 +564,7 @@ export default function BookingSelector({
                   <span className="w-2.5 h-2.5 rounded bg-white border border-slate-300 block" /> Available
                 </p>
                 <p className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded bg-blue-600 block" /> Selected
+                  <span className="w-2.5 h-2.5 rounded bg-[#00694c] block" /> Selected
                 </p>
                 <p className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded bg-zinc-200 border border-zinc-300 block" /> Booked
@@ -679,7 +678,7 @@ export default function BookingSelector({
                 disabled={selectedSlots.length === 0}
                 className={`w-full py-4 rounded-xl font-mono text-xs uppercase tracking-wider font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                   selectedSlots.length > 0
-                    ? 'bg-blue-600 hover:bg-slate-900 text-white shadow-lg shadow-blue-600/10 active:scale-95'
+                    ? 'bg-[#00694c] hover:bg-slate-900 text-white shadow-lg shadow-[#00694c]/10 active:scale-95'
                     : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                 }`}
               >

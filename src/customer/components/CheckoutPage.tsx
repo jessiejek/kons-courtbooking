@@ -16,6 +16,7 @@ interface CheckoutPageProps {
   currentUser?: { name: string; email: string; avatar?: string; } | null;
   finalPrice?: number;
   courtDbId?: number | null;
+  holdSessionId?: string;
 }
 
 export default function CheckoutPage({
@@ -31,6 +32,7 @@ export default function CheckoutPage({
   onLogout,
   finalPrice: finalPriceProp,
   courtDbId,
+  holdSessionId,
 }: CheckoutPageProps) {
   // User Credentials
   const [fullName, setFullName] = useState('');
@@ -57,6 +59,26 @@ export default function CheckoutPage({
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
+
+  // Hold slots in DB for 10 mins — release on unmount or payment
+  const releaseHolds = async () => {
+    if (!isSupabaseEnabled || !supabase || !holdSessionId) return;
+    await supabase.from('slot_holds').delete().eq('session_id', holdSessionId);
+  };
+
+  useEffect(() => {
+    if (!isSupabaseEnabled || !supabase || !holdSessionId || !courtDbId || selectedSlots.length === 0) return;
+    const holdRows = selectedSlots.map(slotTime => ({
+      court_id: courtDbId,
+      slot_date: selectedDate,
+      slot_time: slotTime,
+      session_id: holdSessionId,
+      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    }));
+    // Upsert — replace existing holds for this session
+    supabase.from('slot_holds').upsert(holdRows, { onConflict: 'session_id,court_id,slot_date,slot_time' });
+    return () => { releaseHolds(); };
+  }, []);
 
   // Redirect if no slots selected on mount
   useEffect(() => {
@@ -247,6 +269,7 @@ export default function CheckoutPage({
       await new Promise((r) => setTimeout(r, 1800));
     }
 
+    await releaseHolds();
     onCompleteBooking(newBookingRecord);
     setIsProcessing(false);
     onNavigate('confirmed');
@@ -263,7 +286,7 @@ export default function CheckoutPage({
           <ChevronLeft className="w-5 h-5 text-slate-400 hover:text-white" />
           <div>
             <span className="font-sans font-black uppercase text-sm tracking-tight block">Sunshine pickleball</span>
-            <span className="font-mono text-[8px] uppercase tracking-widest text-blue-400 block font-semibold">Change Schedule</span>
+            <span className="font-mono text-[8px] uppercase tracking-widest text-[#6edba8] block font-semibold">Change Schedule</span>
           </div>
         </button>
 
@@ -279,12 +302,12 @@ export default function CheckoutPage({
         </div>
 
         <div className="flex items-center gap-3 font-mono text-[10px] text-slate-400">
-          <span className="font-black text-blue-400 hidden md:block">SECURE PLATFORM</span>
+          <span className="font-black text-[#6edba8] hidden md:block">SECURE PLATFORM</span>
           {role ? (
             <div className="flex items-center gap-2">
               {currentUser?.avatar
                 ? <img src={currentUser.avatar} referrerPolicy="no-referrer" className="w-7 h-7 rounded-full border border-slate-600 object-cover" />
-                : <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-[11px] font-bold">{currentUser?.name?.[0]?.toUpperCase() ?? 'U'}</div>
+                : <div className="w-7 h-7 rounded-full bg-[#00694c] flex items-center justify-center text-white text-[11px] font-bold">{currentUser?.name?.[0]?.toUpperCase() ?? 'U'}</div>
               }
               <span className="text-slate-300 text-xs hidden md:block max-w-[120px] truncate">{currentUser?.name}</span>
               <button onClick={onLogout} className="text-slate-400 hover:text-white py-1 px-2 bg-zinc-800/80 rounded text-xs">Sign out</button>
@@ -357,7 +380,7 @@ export default function CheckoutPage({
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="e.g. Juan Dela Cruz"
-                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all"
+                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:bg-white focus:border-[#00694c] focus:ring-1 focus:ring-[#00694c] outline-none transition-all"
                   />
                 </div>
               </div>
@@ -375,7 +398,7 @@ export default function CheckoutPage({
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
                     placeholder="e.g. +63 912 345 6789"
-                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all"
+                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:bg-white focus:border-[#00694c] focus:ring-1 focus:ring-[#00694c] outline-none transition-all"
                   />
                 </div>
               </div>
@@ -392,7 +415,7 @@ export default function CheckoutPage({
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="e.g. juan@gmail.com"
-                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:bg-white focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all"
+                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:bg-white focus:border-[#00694c] focus:ring-1 focus:ring-[#00694c] outline-none transition-all"
                   />
                 </div>
               </div>
@@ -446,7 +469,7 @@ export default function CheckoutPage({
                     
                     <div className="flex justify-between items-start">
                       <div>
-                        <span className="text-[9px] font-mono tracking-widest text-blue-400 font-bold block uppercase">PREMIUM VIP RESIDENCY</span>
+                        <span className="text-[9px] font-mono tracking-widest text-[#6edba8] font-bold block uppercase">PREMIUM VIP RESIDENCY</span>
                         <span className="text-xs text-slate-400 mt-0.5 block font-bold">Sunshine Club Pass</span>
                       </div>
                       <div className="w-7 h-5 bg-amber-400/20 rounded border border-amber-400/40" />
@@ -574,7 +597,7 @@ export default function CheckoutPage({
 
                   {gcashStep === 'otp' && (
                     <div className="space-y-4">
-                      <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg text-center text-xs text-blue-800">
+                      <div className="bg-[#e8f5ee] border border-[#00694c]/30 p-3 rounded-lg text-center text-xs text-[#003d2b]">
                         Pin Request sent. We have simulated a 4-digit OTP to +63 {gcashNumber}. (Try typing <span className="font-mono font-bold">1234</span>)
                       </div>
                       
@@ -693,7 +716,7 @@ export default function CheckoutPage({
                 </span>
                 <h4 className="font-sans font-bold text-sm text-slate-900 mt-1.5">{selectedCourt.name}</h4>
                 <p className="text-xs text-slate-500 mt-1">{getReadableSelectedDate()}</p>
-                <p className="text-xs font-semibold text-blue-800 mt-1 bg-blue-100 px-2 py-1 rounded w-fit">{getSelectedTimeRangeLabel()}</p>
+                <p className="text-xs font-semibold text-[#003d2b] mt-1 bg-[#bbead4] px-2 py-1 rounded w-fit">{getSelectedTimeRangeLabel()}</p>
               </div>
 
               <hr className="border-slate-100" />
@@ -744,7 +767,7 @@ export default function CheckoutPage({
                 onClick={handlePaySubmit}
                 className={`w-full py-4 rounded-xl font-mono text-xs uppercase tracking-wider font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                   isFormValid() && !isProcessing
-                    ? 'bg-blue-600 hover:bg-slate-900 text-white shadow-lg'
+                    ? 'bg-[#00694c] hover:bg-slate-900 text-white shadow-lg'
                     : 'bg-slate-150 text-slate-400 cursor-not-allowed border border-slate-200'
                 }`}
               >
