@@ -119,6 +119,27 @@ export default function BookingsHistory({
     onViewDetail(id);
   };
 
+  if (!role) {
+    return (
+      <div className="bg-[#111412] min-h-screen flex flex-col items-center justify-center gap-6 px-6 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-[#00694c] flex items-center justify-center">
+          <ClipboardList className="w-8 h-8 text-white" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-black text-white">Sign in to see your bookings</h2>
+          <p className="text-sm text-slate-400 mt-2 max-w-xs">Your booking history is tied to your account. Log in to view, manage, or cancel reservations.</p>
+        </div>
+        <button
+          onClick={onOpenLogin}
+          className="bg-[#00694c] text-white font-bold text-sm uppercase tracking-wider px-8 py-3 rounded-xl hover:bg-[#005a40] transition-all"
+        >
+          Log in
+        </button>
+        <button onClick={() => onNavigate('landing')} className="text-slate-500 text-xs underline">Back to home</button>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-[#f9f9f7] min-h-screen font-sans flex flex-col">
       {/* Header Bar */}
