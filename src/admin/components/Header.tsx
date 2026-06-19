@@ -14,7 +14,7 @@ export default function Header({ searchText, onSearchChange, backAction }: Heade
   const navigate = useNavigate();
 
   return (
-    <header className="h-16 flex items-center justify-between px-10 sticky top-0 bg-background/90 backdrop-blur-md z-40 border-b border-outline-variant">
+    <header className="hidden lg:flex h-16 items-center justify-between px-10 sticky top-0 bg-background/90 backdrop-blur-md z-40 border-b border-outline-variant">
       {/* Left side: Back action OR search bar */}
       <div className="flex-1 flex items-center max-w-md">
         {backAction ? (

@@ -358,10 +358,10 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
           onConfirm: () => { setConfirmOpts(null); onLogout(); },
         })}
       />
-      <div className="flex-1 ml-64 flex flex-col min-h-screen">
+      <div className="flex-1 lg:ml-64 flex flex-col min-h-screen pt-14 lg:pt-0">
         <Header searchText={searchText} onSearchChange={setSearchText} backAction={backAction} />
 
-        <main className="p-10 max-w-7xl w-full mx-auto flex-1 pb-24">
+        <main className="p-4 md:p-6 lg:p-10 max-w-7xl w-full mx-auto flex-1 pb-24 lg:pb-10">
           {loadingBookings && (
             <div className="text-center py-4 text-sm text-on-surface-variant font-medium animate-pulse">
               Loading bookings from Supabase…
