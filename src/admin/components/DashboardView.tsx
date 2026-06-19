@@ -252,7 +252,7 @@ export default function DashboardView({
 
           <div className="h-64 w-full relative pt-4">
             {/* Native Clean Custom Column chart matching CSS specs */}
-            <div className="absolute inset-0 flex items-end justify-between px-2 gap-4">
+            <div className="absolute inset-0 flex items-end justify-between px-2 gap-0.5 sm:gap-4">
               {revenueDataWithPeak.map((item, index) => {
                 const heightPercent = `${Math.max(4, Math.round((item.value / Math.max(peakValue, 1)) * 100))}%`;
                 return (
@@ -282,7 +282,7 @@ export default function DashboardView({
             <div className="absolute inset-0 border-b border-l border-outline-variant pointer-events-none opacity-20 chart-grid"></div>
           </div>
           
-          <div className="flex justify-between mt-4 text-[10px] text-outline font-bold tracking-wider uppercase border-t border-outline-variant/30 pt-3">
+          <div className="flex justify-between mt-4 text-[10px] text-outline font-bold tracking-wider uppercase border-t border-outline-variant/30 pt-3 gap-0.5 sm:gap-4 overflow-hidden">
             {revenueDataWithPeak.map((d, index) => (
               <span key={index}>{d.day}</span>
             ))}

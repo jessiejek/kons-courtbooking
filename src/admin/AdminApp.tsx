@@ -425,7 +425,7 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
           </Routes>
         </main>
 
-        <footer className="mt-auto px-10 py-5 border-t border-outline-variant flex justify-between items-center bg-surface-container-low/30 text-xs">
+        <footer className="mt-auto px-4 sm:px-10 py-4 border-t border-outline-variant flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 bg-surface-container-low/30 text-xs">
           <p className="text-outline font-semibold">&copy; 2026 Court &amp; Co. Admin Terminal. All rights reserved.</p>
           <div className="flex gap-4">
             <button onClick={() => navigate('/')} className="text-outline font-semibold hover:text-primary transition-colors">

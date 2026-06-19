@@ -493,7 +493,7 @@ export default function CourtsPricingView({
                         onChange={(r) => handleCourtRangeChange(court.id, r)}
                         defaultRate={court.defaultPrice}
                       />
-                      <div className="flex items-center justify-between pt-2 border-t border-outline-variant/30">
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-outline-variant/30">
                         <button
                           onClick={() => handleResetCourt(court.id)}
                           className="flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant hover:text-on-surface border border-outline-variant px-4 py-2 rounded-lg uppercase tracking-wider transition-colors"
