@@ -299,9 +299,9 @@ export default function DashboardView({
               )}
               {courtOccupancy.map(c => (
                 <div key={c.id} className="space-y-2">
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span>{c.name}</span>
-                    <span className="text-primary font-bold">{c.pct}%</span>
+                  <div className="flex justify-between text-xs font-semibold gap-2">
+                    <span className="truncate min-w-0">{c.name}</span>
+                    <span className="text-primary font-bold shrink-0">{c.pct}%</span>
                   </div>
                   <div className="h-2 w-full bg-surface-container-low overflow-hidden rounded">
                     <div className="h-full bg-primary rounded" style={{ width: `${c.pct}%` }}></div>
