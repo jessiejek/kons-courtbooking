@@ -150,7 +150,7 @@ export default function Sidebar({ onNewBookingClick, newBookingCount = 0, onClea
       )}
 
       {/* ── Mobile bottom nav bar ── */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-outline-variant z-50 flex">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-outline-variant z-50 flex pb-[env(safe-area-inset-bottom)]">
         {menuItems.map((item) => {
           const IconComponent = item.icon;
           const active = isActive(item.path);
