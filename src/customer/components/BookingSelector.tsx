@@ -320,6 +320,14 @@ export default function BookingSelector({
     return slot.period === activePeriodFilter;
   });
 
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const isPastSlot = (time: string) => {
+    if (selectedDate !== todayStr) return false;
+    const slotH = parseInt(time.split(':')[0]);
+    return slotH <= now.getHours();
+  };
+
   return (
     <div className="bg-[#f9f9f7] min-h-screen font-sans flex flex-col">
       {/* Header Bar */}
@@ -574,18 +582,21 @@ export default function BookingSelector({
                   const slotBooked = isSlotBooked(slot.time);
                   const slotStatus = getSlotStatus(slot.time);
                   const isPending = slotStatus === 'pending';
+                  const isPast = isPastSlot(slot.time);
                   const isSlotCurrentlySelected = selectedSlots.includes(slot.time);
-                  const selectable = !slotBooked && isSlotSelectable(slot.time);
-                  const nonContiguous = !slotBooked && !selectable;
+                  const selectable = !slotBooked && !isPast && isSlotSelectable(slot.time);
+                  const nonContiguous = !slotBooked && !isPast && !selectable;
 
                   return (
                     <button
                       key={slot.time}
-                      disabled={slotBooked || nonContiguous}
-                      onClick={() => handleSlotToggle(slot.time, slotBooked)}
-                      title={nonContiguous ? 'Select consecutive slots only' : undefined}
+                      disabled={slotBooked || nonContiguous || isPast}
+                      onClick={() => handleSlotToggle(slot.time, slotBooked || isPast)}
+                      title={isPast ? 'This time has already passed' : nonContiguous ? 'Select consecutive slots only' : undefined}
                       className={`flex items-center justify-between p-3 rounded-lg border transition-all text-left relative overflow-hidden ${
-                        slotBooked
+                        isPast
+                          ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed opacity-40'
+                          : slotBooked
                           ? isPending
                             ? 'bg-amber-50 border-amber-200 text-amber-700 cursor-not-allowed opacity-80'
                             : 'bg-zinc-100 border-zinc-200 text-slate-400 cursor-not-allowed opacity-60'
@@ -600,12 +611,16 @@ export default function BookingSelector({
                         <div className="text-[11px] font-mono leading-none tracking-tight">
                           {slot.label}
                         </div>
-                        <div className={`text-[9px] font-mono mt-1 leading-none ${isPending ? 'text-amber-600' : 'text-slate-400'}`}>
-                          {slotBooked ? (isPending ? 'Awaiting approval' : 'Booked') : `₱${getSlotRate(slot.time)}/hr`}
+                        <div className={`text-[9px] font-mono mt-1 leading-none ${isPast ? 'text-slate-300' : isPending ? 'text-amber-600' : 'text-slate-400'}`}>
+                          {isPast ? 'Past' : slotBooked ? (isPending ? 'Awaiting approval' : 'Booked') : `₱${getSlotRate(slot.time)}/hr`}
                         </div>
                       </div>
 
-                      {slotBooked ? (
+                      {isPast ? (
+                        <span className="text-[9px] font-mono bg-slate-100 text-slate-300 px-1.5 py-0.5 rounded font-black uppercase">
+                          Past
+                        </span>
+                      ) : slotBooked ? (
                         <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-black uppercase ${
                           isPending ? 'bg-amber-100 text-amber-700' : 'bg-zinc-200 text-zinc-500'
                         }`}>
