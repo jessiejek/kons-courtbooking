@@ -389,7 +389,7 @@ export default function WalkinView({ courts, onWalkinCreated, toast }: WalkinVie
                           key={hour}
                           onClick={() => handleSlotClick(court.id, hour, !!booking)}
                           title={booking ? `${booking.customer_name} · ${fmtTime(booking.start_time)}–${fmtTime(booking.end_time)}` : selectable ? `Click to select ${fmtHour(hour)}` : ''}
-                          className={`flex flex-col items-center justify-center rounded-lg text-center py-2 px-0.5 border-2 transition-all duration-100 select-none ${cellClass}`}
+                          className={`${(past || !!booking) ? 'hidden sm:flex' : 'flex'} flex-col items-center justify-center rounded-lg text-center py-2 px-0.5 border-2 transition-all duration-100 select-none ${cellClass}`}
                         >
                           <span className={`text-[10px] font-bold block leading-tight ${hourLabelClass}`}>
                             {fmtHour(hour)}
