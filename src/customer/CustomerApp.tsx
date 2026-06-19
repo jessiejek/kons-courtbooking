@@ -118,6 +118,7 @@ export default function CustomerApp({ role, onLogin, onLogout, currentUser }: Pr
             selectedDate={selectedDate}
             selectedSlots={selectedSlots}
             cartTimeLeft={cartTimeLeft}
+            setCartTimeLeft={setCartTimeLeft}
             onCompleteBooking={handleCompleteBooking}
             finalPrice={finalPrice}
             courtDbId={courtDbId}

@@ -9,6 +9,7 @@ interface CheckoutPageProps {
   selectedDate: string;
   selectedSlots: string[];
   cartTimeLeft: number;
+  setCartTimeLeft: React.Dispatch<React.SetStateAction<number>>;
   onCompleteBooking: (booking: Booking) => void;
   onOpenLogin: () => void;
   role: 'user' | 'admin' | null;
@@ -25,6 +26,7 @@ export default function CheckoutPage({
   selectedDate,
   selectedSlots,
   cartTimeLeft,
+  setCartTimeLeft,
   onCompleteBooking,
   onOpenLogin,
   role,
@@ -67,9 +69,18 @@ export default function CheckoutPage({
       session_id: holdSessionId,
       expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     }));
-    // Upsert — replace existing holds for this session
     supabase.from('slot_holds').upsert(holdRows, { onConflict: 'session_id,court_id,slot_date,slot_time' });
     return () => { releaseHolds(); };
+  }, []);
+
+  // Keep the countdown running while on this page
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (typeof setCartTimeLeft === 'function') {
+        setCartTimeLeft((prev: number) => (prev <= 1 ? 0 : prev - 1));
+      }
+    }, 1000);
+    return () => clearInterval(timer);
   }, []);
 
   // Demo fallback when accessed directly with no slots (e.g. /checkout via URL bar)
