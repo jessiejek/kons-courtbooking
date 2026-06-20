@@ -59,7 +59,7 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
       .from('open_play_sessions')
       .select('id, court_id, date, start_time, end_time, skill_filter, status')
       .in('status', ['upcoming', 'active'])
-      .order('status', { ascending: false }) // 'upcoming' < 'active' alphabetically → active first
+      .order('status', { ascending: true }) // 'active' < 'upcoming' alphabetically → active first
       .order('date', { ascending: true })
       .limit(1)
       .maybeSingle()
