@@ -261,34 +261,32 @@ function ScoringPanel({ game, registrations, maxScore, onGameEnd, onUpdate, rrMo
   const TeamSide = ({ team, regs }: { team: 'A' | 'B'; regs: OPRegistration[] }) => {
     const isServing = servingTeam === team;
     const side = getSide(team);
+    // Split team name string into individual player names for RR mode
     const teamLabel = rrMode ? (team === 'A' ? rrMode.teamA : rrMode.teamB) : null;
+    const playerNames: string[] = regs.length > 0
+      ? regs.map(r => r.player_name)
+      : teamLabel ? teamLabel.split(' & ') : [];
     return (
-      <div className={`flex-1 p-3 rounded-xl border ${isServing ? 'bg-green-50 border-primary/30' : 'bg-white border-outline-variant/30'}`}>
-        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+      <div className={`rounded-xl border ${isServing ? 'bg-green-50 border-primary/30' : 'bg-white border-outline-variant/30'} p-3`}>
+        <div className="flex items-center gap-1.5 mb-2">
           <span className="text-[9px] font-black uppercase tracking-widest text-outline">Team {team}</span>
-          {isServing && <span className="text-[9px] font-black bg-primary text-white px-1.5 py-0.5 rounded">SERVING</span>}
         </div>
-        {teamLabel ? (
-          <p className="text-sm font-bold text-on-surface">{teamLabel}</p>
-        ) : (
-          regs.map((r, i) => {
-            const isServer = isServing && serverIdx === i;
-            return (
-              <div key={r.id} className="mb-1.5">
-                <div className="flex items-center gap-1.5">
-                  <TierDot tier={r.skill_tier} />
-                  <span className={`text-sm font-bold ${isServer ? 'text-primary' : 'text-on-surface'}`}>{r.player_name}</span>
-                  {isServer && <span className="text-[9px] font-bold text-primary">🏓</span>}
-                </div>
-                {isServer && (
-                  <div className="ml-3.5 flex items-center gap-1 mt-0.5">
-                    <span className="text-[9px] text-primary font-bold">{side} side</span>
-                  </div>
-                )}
+        {playerNames.map((name, i) => {
+          const isServer = isServing && serverIdx === i;
+          const r = regs[i];
+          return (
+            <div key={i} className={`flex items-center justify-between rounded-lg px-2 py-1.5 mb-1 ${isServer ? 'bg-primary/10' : ''}`}>
+              <div className="flex items-center gap-2">
+                {r && <TierDot tier={r.skill_tier} />}
+                <span className={`text-sm font-bold leading-tight ${isServer ? 'text-primary' : 'text-on-surface'}`}>{name}</span>
               </div>
-            );
-          })
-        )}
+              {isServer
+                ? <span className="text-[9px] font-black bg-primary text-white px-1.5 py-0.5 rounded-full whitespace-nowrap">SERVING · {side}</span>
+                : <span className="text-[9px] text-outline font-medium">–</span>
+              }
+            </div>
+          );
+        })}
       </div>
     );
   };
