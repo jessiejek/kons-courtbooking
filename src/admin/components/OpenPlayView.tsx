@@ -263,7 +263,13 @@ function ScoringPanel({ game, registrations, maxScore, onGameEnd, onUpdate }: Sc
       status: 'ended', winner_team: winner,
       score_a: sA, score_b: sB, ended_at: new Date().toISOString(),
     }).eq('id', game.id);
-    // Check if winners already have 2 consecutive wins → this win makes 3 → champion!
+    // DELIBERATE TEAM ACHIEVEMENT — do not change to per-player check.
+    // Champion fires when ALL members of the winning team independently carry
+    // 2+ consecutive wins (i.e. this is their 3rd win in a row together).
+    // Pool-size dependency: in a 4-player pool the same two teams reform every
+    // game so this fires quickly; in larger pools teams scramble and it is rare.
+    // Both behaviors are intended. The check reads pre-increment state (2 in DB
+    // = 3rd win about to be awarded), so >= 2 is correct.
     const winnerRegs = winner === 'A' ? teamARegs : teamBRegs;
     const isChampion = winnerRegs.every(r => r.consecutive_wins >= 2);
     if (isChampion) { setScreen('champion'); return; }
