@@ -680,6 +680,16 @@ export default function OpenPlayView() {
 
   const generateNextMatch = async () => {
     if (!selectedSessionId || !isSupabaseEnabled || !supabase) return;
+
+    // Guard: don't create a new game if one is already active
+    const { data: existing } = await supabase
+      .from('open_play_games')
+      .select('id')
+      .eq('session_id', selectedSessionId)
+      .in('status', ['rally', 'active'])
+      .limit(1);
+    if (existing && existing.length > 0) { await loadRegistrations(); return; }
+
     const { data: pool } = await supabase
       .from('open_play_registrations')
       .select('*')
@@ -700,7 +710,6 @@ export default function OpenPlayView() {
       status: 'rally',
     }).select().single();
 
-    // Mark players as playing
     const ids = [...teamA, ...teamB].map(p => p.id);
     await supabase.from('open_play_registrations').update({ status: 'playing' }).in('id', ids);
 
@@ -714,27 +723,31 @@ export default function OpenPlayView() {
     const winnerIds = winner === 'A' ? activeGame.team_a : activeGame.team_b;
     const loserIds = winner === 'A' ? activeGame.team_b : activeGame.team_a;
 
-    // Winners: increment consecutive_wins, status back to waiting
+    const now = Date.now();
+    // Losers go to pool first (current time) — they wait less next round
+    // Winners go to back of pool (now + 1 hour offset) — they just won, others go first
+    const loserTime  = new Date(now).toISOString();
+    const winnerTime = new Date(now + 60 * 60 * 1000).toISOString();
+
     for (const id of winnerIds) {
       const reg = registrations.find(r => r.id === id);
       const newWins = (reg?.consecutive_wins ?? 0) + 1;
-      const bumped = newWins >= 3; // 3-win rule
+      const bumped = newWins >= 3;
       await supabase.from('open_play_registrations').update({
         status: 'waiting',
         games_played: (reg?.games_played ?? 0) + 1,
         consecutive_wins: bumped ? 0 : newWins,
-        entered_pool_at: new Date().toISOString(),
+        entered_pool_at: winnerTime, // winners go to back
       }).eq('id', id);
     }
 
-    // Losers: reset consecutive_wins, back to waiting
     for (const id of loserIds) {
       const reg = registrations.find(r => r.id === id);
       await supabase.from('open_play_registrations').update({
         status: 'waiting',
         games_played: (reg?.games_played ?? 0) + 1,
         consecutive_wins: 0,
-        entered_pool_at: new Date().toISOString(),
+        entered_pool_at: loserTime, // losers go ahead of winners
       }).eq('id', id);
     }
 
