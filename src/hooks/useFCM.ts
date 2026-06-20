@@ -16,7 +16,7 @@ export function useFCM(userEmail: string | null | undefined, role: 'user' | 'adm
       if (!token) return;
       await supabase!.from('fcm_tokens').upsert(
         { email: userEmail, token, role },
-        { onConflict: 'email' }
+        { onConflict: 'token' }
       );
     } catch (err) {
       console.error('[FCM] token error:', err);
