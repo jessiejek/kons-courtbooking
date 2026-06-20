@@ -120,6 +120,7 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
       player_email: currentUser?.email ?? null,
       skill_tier: tier,
       is_walkin: !currentUser,
+      is_present: false, // Fix I: set false for self-reg; admin marks present at check-in
       status: 'waiting',
       entered_pool_at: new Date().toISOString(),
     });
@@ -192,9 +193,9 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
         <div className="w-20 h-20 rounded-full bg-[#00694c]/20 border-2 border-[#00694c] flex items-center justify-center text-4xl">🏓</div>
         <h1 className="text-white font-black text-3xl text-center">You're in!</h1>
         <p className="text-[#9ca3af] text-sm text-center max-w-sm">
-          <span className="text-white font-bold">{currentUser?.name ?? walkinName}</span> is registered for Open Play on{' '}
+          <span className="text-white font-bold">{currentUser?.name ?? walkinName}</span> is in the waiting pool for{' '}
           <span className="text-[#00ff88] font-bold">{session.court_name}</span> — {session.date} at {session.start_time.slice(0,5)}.
-          Show up and you'll be added to the pool!
+          Show up at the court and the admin will mark you present to enter the rotation.
         </p>
         <div className="flex gap-3">
           {session.status === 'active' && (

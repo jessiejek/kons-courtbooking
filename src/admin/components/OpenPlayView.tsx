@@ -612,6 +612,7 @@ function AddPlayerModal({ sessionId, onClose, onAdded }: {
       player_email: email.trim() || null,
       skill_tier: tier,
       is_walkin: true,
+      is_present: true, // Fix I: admin adds players at the court — always present
       status: 'waiting',
       entered_pool_at: new Date().toISOString(),
     });
