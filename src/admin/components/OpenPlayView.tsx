@@ -19,6 +19,7 @@ interface OPSession {
   status: 'upcoming' | 'active' | 'ended';
   is_recurring: boolean;
   recurrence_rule: 'daily' | 'weekly' | null;
+  skill_balance_mode: 'arrival_order' | 'skill_aware';
 }
 
 interface OPRegistration {
@@ -76,24 +77,55 @@ function TierChip({ tier }: { tier: string }) {
 
 // ─── Smart Matchmaking ────────────────────────────────────────────────────────
 
-function makeMatch(pool: OPRegistration[]): [OPRegistration[], OPRegistration[]] | null {
+const TIER_VAL: Record<string, number> = { pro: 3, intermediate: 2, beginner: 1 };
+
+function snakeDraft(four: OPRegistration[]): [OPRegistration[], OPRegistration[]] {
+  const ranked = [...four].sort((a, b) => TIER_VAL[b.skill_tier] - TIER_VAL[a.skill_tier]);
+  return [[ranked[0], ranked[3]], [ranked[1], ranked[2]]];
+}
+
+// Fix 3: skill_aware mode — prefer balanced group of 4 within tolerance (max tier spread = 1).
+// Never skips a player more than MAX_SKIP positions back to avoid starvation.
+const MAX_SKIP = 3;
+
+function makeMatch(
+  pool: OPRegistration[],
+  mode: 'arrival_order' | 'skill_aware' = 'arrival_order'
+): [OPRegistration[], OPRegistration[]] | null {
   if (pool.length < 4) return null;
 
-  // Take the 4 who have waited longest
-  const next4 = [...pool]
-    .sort((a, b) => new Date(a.entered_pool_at).getTime() - new Date(b.entered_pool_at).getTime())
-    .slice(0, 4);
+  const byWait = [...pool].sort(
+    (a, b) => new Date(a.entered_pool_at).getTime() - new Date(b.entered_pool_at).getTime()
+  );
 
-  // Snake draft by skill: sort desc [Pro, Pro, Mid, Beg]
-  // Pair [0]+[3] vs [1]+[2] → always most balanced possible
-  // e.g. Pro+Beg (4) vs Pro+Mid (5) — or Pro+Beg (4) vs Mid+Mid (4)
-  const tierVal = { pro: 3, intermediate: 2, beginner: 1 };
-  const ranked = [...next4].sort((a, b) => tierVal[b.skill_tier] - tierVal[a.skill_tier]);
+  if (mode === 'arrival_order') {
+    return snakeDraft(byWait.slice(0, 4));
+  }
 
-  const teamA: OPRegistration[] = [ranked[0], ranked[3]]; // strongest + weakest
-  const teamB: OPRegistration[] = [ranked[1], ranked[2]]; // 2nd + 3rd
+  // skill_aware: among top (4 + MAX_SKIP) candidates, find the group of 4
+  // with smallest tier spread. Fallback to arrival_order if no better group found.
+  const candidates = byWait.slice(0, 4 + MAX_SKIP);
+  let bestGroup: OPRegistration[] = byWait.slice(0, 4);
+  let bestSpread = Infinity;
 
-  return [teamA, teamB];
+  // Try every combination of 4 from candidates
+  for (let i = 0; i < candidates.length - 3; i++) {
+    for (let j = i + 1; j < candidates.length - 2; j++) {
+      for (let k = j + 1; k < candidates.length - 1; k++) {
+        for (let l = k + 1; l < candidates.length; l++) {
+          const group = [candidates[i], candidates[j], candidates[k], candidates[l]];
+          const tiers = group.map(p => TIER_VAL[p.skill_tier]);
+          const spread = Math.max(...tiers) - Math.min(...tiers);
+          if (spread < bestSpread) {
+            bestSpread = spread;
+            bestGroup = group;
+          }
+        }
+      }
+    }
+  }
+
+  return snakeDraft(bestGroup);
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -404,6 +436,7 @@ function CreateSessionModal({ courts, onClose, onCreated }: {
   const [playerCap, setPlayerCap] = useState<number | ''>('');
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceRule, setRecurrenceRule] = useState<'daily' | 'weekly'>('weekly');
+  const [skillBalanceMode, setSkillBalanceMode] = useState<'arrival_order' | 'skill_aware'>('arrival_order');
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -420,6 +453,7 @@ function CreateSessionModal({ courts, onClose, onCreated }: {
       player_cap: playerCap === '' ? null : Number(playerCap),
       is_recurring: isRecurring,
       recurrence_rule: isRecurring ? recurrenceRule : null,
+      skill_balance_mode: skillBalanceMode,
       status: 'upcoming',
     });
     setSaving(false);
@@ -491,6 +525,25 @@ function CreateSessionModal({ courts, onClose, onCreated }: {
               <input type="number" min={4} value={playerCap} onChange={e => setPlayerCap(e.target.value === '' ? '' : Number(e.target.value))}
                 placeholder="No limit"
                 className="w-full border border-outline-variant rounded-lg p-2 text-sm focus:border-primary focus:ring-0" />
+            </div>
+          </div>
+
+          {/* Matching Mode */}
+          <div>
+            <label className="block text-xs font-bold text-outline uppercase tracking-wider mb-1">Matching Mode</label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {([
+                { value: 'arrival_order', label: 'Arrival Order', desc: 'First-come, first-matched' },
+                { value: 'skill_aware',  label: 'Skill Aware',   desc: 'Balance by skill tier' },
+              ] as const).map(m => (
+                <button key={m.value} type="button" onClick={() => setSkillBalanceMode(m.value)}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all text-left ${
+                    skillBalanceMode === m.value ? 'bg-primary text-white border-primary' : 'border-outline-variant text-on-surface-variant hover:border-primary'
+                  }`}>
+                  <div>{m.label}</div>
+                  <div className={`text-[10px] font-normal mt-0.5 ${skillBalanceMode === m.value ? 'text-white/70' : 'text-outline'}`}>{m.desc}</div>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -688,16 +741,14 @@ export default function OpenPlayView() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'open_play_registrations', filter: `session_id=eq.${selectedSessionId}` },
         async (payload: any) => {
           await loadRegistrations();
-          // Fix 2: if a new registration pushed the waiting pool to 4, auto-generate
+          // Fix A: use count field from PostgREST HEAD response (data is null with head:true)
           if (payload.eventType === 'INSERT' || (payload.new?.status === 'waiting' && payload.old?.status !== 'waiting')) {
-            const { data: waiters } = await supabase!
+            const { count } = await supabase!
               .from('open_play_registrations')
-              .select('id', { count: 'exact', head: true })
+              .select('*', { count: 'exact', head: true })
               .eq('session_id', selectedSessionId)
               .eq('status', 'waiting');
-            // @ts-ignore — count is on the response
-            const count = (waiters as any)?.length ?? 0;
-            if (count >= 4) generateNextMatch();
+            if ((count ?? 0) >= 4) await generateNextMatch();
           }
         })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'open_play_games', filter: `session_id=eq.${selectedSessionId}` },
@@ -735,7 +786,8 @@ export default function OpenPlayView() {
     // Fix 2: surface awaiting_players state — auto-retry fires via Realtime when 4th player joins
     if (!pool || pool.length < 4) { await loadRegistrations(); return; }
 
-    const match = makeMatch(pool);
+    const balanceMode = sessions.find(s => s.id === selectedSessionId)?.skill_balance_mode ?? 'arrival_order';
+    const match = makeMatch(pool, balanceMode);
     if (!match) { await loadRegistrations(); return; }
 
     const [teamA, teamB] = match;
