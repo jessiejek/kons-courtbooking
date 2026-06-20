@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseEnabled } from '../../lib/supabase';
 import { CurrentUser } from '../../App';
+import { MINS_PER_GAME_LOW, MINS_PER_GAME_HIGH, PLAYERS_PER_MATCH } from '../../lib/openPlayMatchmaking';
 
 interface Props {
   currentUser: CurrentUser | null;
@@ -18,6 +19,7 @@ interface OPSession {
   skill_filter: string;
   status: string;
   player_cap: number | null;
+  session_type: 'rotation' | 'round_robin';
 }
 
 type Tier = 'beginner' | 'intermediate' | 'pro';
@@ -35,8 +37,16 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
 
   const [session, setSession] = useState<OPSession | null>(null);
   const [loadingSession, setLoadingSession] = useState(true);
+
+  // Rotation fields
   const [tier, setTier] = useState<Tier | null>(null);
   const [walkinName, setWalkinName] = useState('');
+
+  // Round-Robin fields
+  const [p1Name, setP1Name] = useState(currentUser?.name ?? '');
+  const [p2Name, setP2Name] = useState('');
+  const [teamEmail, setTeamEmail] = useState(currentUser?.email ?? '');
+
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
@@ -67,7 +77,7 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
     });
   }, [sessionId, currentUser]);
 
-  // Fix H: keep wait advisory live via Realtime — re-fetch counts on any registration change
+  // Fix H: keep wait advisory live via Realtime
   useEffect(() => {
     if (!sessionId || !isSupabaseEnabled || !supabase) return;
     const ch = supabase
@@ -88,14 +98,13 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
     return () => { supabase.removeChannel(ch); };
   }, [sessionId]);
 
-  const handleSubmit = async () => {
+  const handleSubmitRotation = async () => {
     if (!tier || !session || !supabase) return;
     const name = currentUser?.name ?? walkinName.trim();
     if (!name) { setError('Please enter your name.'); return; }
     setSubmitting(true);
     setError(null);
 
-    // Guest dedup: check if a walk-in with this name already exists in the session
     if (!currentUser) {
       const { data: existing } = await supabase
         .from('open_play_registrations')
@@ -112,21 +121,19 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
       }
     }
 
-    // Fix C: set entered_pool_at explicitly so queue ordering never silently
-    // depends on whether the DB column has a DEFAULT configured.
+    // Fix C: set entered_pool_at explicitly
     const { error: err } = await supabase.from('open_play_registrations').insert({
       session_id: session.id,
       player_name: name,
       player_email: currentUser?.email ?? null,
       skill_tier: tier,
       is_walkin: !currentUser,
-      is_present: false, // Fix I: set false for self-reg; admin marks present at check-in
+      is_present: false, // Fix I: self-reg → false; admin marks present at check-in
       status: 'waiting',
       entered_pool_at: new Date().toISOString(),
     });
 
     if (err) {
-      // Handle DB-level unique constraint violation gracefully
       const msg = err.code === '23505'
         ? `"${name}" is already registered for this session.`
         : err.message;
@@ -137,7 +144,29 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
     }
   };
 
-  // Guest users can still walk in — no login required
+  const handleSubmitRR = async () => {
+    if (!session || !supabase) return;
+    const p1 = p1Name.trim() || currentUser?.name?.trim() || '';
+    const p2 = p2Name.trim();
+    if (!p1) { setError('Enter player 1 name.'); return; }
+    if (!p2) { setError("Enter your partner's name."); return; }
+    setSubmitting(true);
+    setError(null);
+
+    const { error: err } = await supabase.from('open_play_teams').insert({
+      session_id: session.id,
+      player1_name: p1,
+      player2_name: p2,
+      email: teamEmail.trim() || currentUser?.email || null,
+    });
+
+    if (err) {
+      setError(err.message);
+      setSubmitting(false);
+    } else {
+      setDone(true);
+    }
+  };
 
   if (loadingSession) {
     return (
@@ -167,15 +196,17 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
     );
   }
 
+  const isRR = session.session_type === 'round_robin';
   const isFull = session.player_cap !== null && playerCount >= session.player_cap;
 
-  // ── Already registered ──────────────────────────────────────────────────────
   if (alreadyRegistered) {
     return (
       <div className="min-h-screen bg-[#0a1a12] flex flex-col items-center justify-center gap-6 p-6">
         <div className="text-6xl">✅</div>
         <h1 className="text-white font-black text-2xl text-center">You're already in!</h1>
-        <p className="text-[#6b7280] text-sm text-center">You're registered for Open Play on <span className="text-white font-bold">{session.court_name}</span> — {session.date} at {session.start_time.slice(0,5)}.</p>
+        <p className="text-[#6b7280] text-sm text-center">
+          You're registered for Open Play on <span className="text-white font-bold">{session.court_name}</span> — {session.date} at {session.start_time.slice(0,5)}.
+        </p>
         {session.status === 'active' && (
           <a href="/open-play/live" className="bg-[#00694c] text-white font-black px-8 py-3.5 rounded-xl hover:bg-[#005a40] transition-colors flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" /> Watch Live →
@@ -186,17 +217,23 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
     );
   }
 
-  // ── Success ─────────────────────────────────────────────────────────────────
   if (done) {
     return (
       <div className="min-h-screen bg-[#0a1a12] flex flex-col items-center justify-center gap-6 p-6">
         <div className="w-20 h-20 rounded-full bg-[#00694c]/20 border-2 border-[#00694c] flex items-center justify-center text-4xl">🏓</div>
         <h1 className="text-white font-black text-3xl text-center">You're in!</h1>
-        <p className="text-[#9ca3af] text-sm text-center max-w-sm">
-          <span className="text-white font-bold">{currentUser?.name ?? walkinName}</span> is in the waiting pool for{' '}
-          <span className="text-[#00ff88] font-bold">{session.court_name}</span> — {session.date} at {session.start_time.slice(0,5)}.
-          Show up at the court and the admin will mark you present to enter the rotation.
-        </p>
+        {isRR ? (
+          <p className="text-[#9ca3af] text-sm text-center max-w-sm">
+            Team <span className="text-white font-bold">{p1Name} & {p2Name}</span> is registered for{' '}
+            <span className="text-[#00ff88] font-bold">{session.court_name}</span> Round-Robin — {session.date} at {session.start_time.slice(0,5)}.
+          </p>
+        ) : (
+          <p className="text-[#9ca3af] text-sm text-center max-w-sm">
+            <span className="text-white font-bold">{currentUser?.name ?? walkinName}</span> is in the waiting pool for{' '}
+            <span className="text-[#00ff88] font-bold">{session.court_name}</span> — {session.date} at {session.start_time.slice(0,5)}.
+            Show up at the court and the admin will mark you present to enter the rotation.
+          </p>
+        )}
         <div className="flex gap-3">
           {session.status === 'active' && (
             <a href="/open-play/live" className="bg-[#00694c] text-white font-black px-6 py-3 rounded-xl hover:bg-[#005a40] transition-colors flex items-center gap-2">
@@ -211,10 +248,8 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
     );
   }
 
-  // ── Registration form ───────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#0a1a12] text-white flex flex-col items-center justify-start pt-10 px-4 pb-16">
-      {/* Back */}
       <div className="w-full max-w-lg mb-6">
         <button onClick={() => navigate('/')} className="text-[#4b5563] text-sm hover:text-white transition-colors flex items-center gap-1.5">
           ← Back
@@ -223,27 +258,95 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
 
       {/* Session card */}
       <div className="w-full max-w-lg bg-[#111c15] border border-[#00694c30] rounded-2xl p-5 mb-6">
-        <div className="flex items-center gap-2 mb-3">
-          <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded ${session.status === 'active' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-[#00694c]/20 text-[#00ff88] border border-[#00694c]/30'}`}>
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded ${
+            session.status === 'active' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-[#00694c]/20 text-[#00ff88] border border-[#00694c]/30'
+          }`}>
             {session.status === 'active' ? '🔴 Live Now' : '📅 Upcoming'}
+          </span>
+          <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded ${
+            isRR ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-green-500/20 text-green-400 border border-green-500/30'
+          }`}>
+            {isRR ? '🔵 Round-Robin' : '🟢 Rotation'}
           </span>
           {isFull && <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded bg-red-900/30 text-red-400 border border-red-500/30">Full</span>}
         </div>
         <h2 className="text-lg font-black text-white mb-0.5">{session.court_name}</h2>
         <p className="text-[#6b7280] text-sm">{session.date} · {session.start_time.slice(0,5)} – {session.end_time.slice(0,5)}</p>
-        <p className="text-[#4b5563] text-xs mt-1 capitalize">
-          {session.skill_filter === 'all' ? 'All skill levels welcome' : `${session.skill_filter} players only`}
-          {session.player_cap && ` · ${playerCount}/${session.player_cap} registered`}
-        </p>
+        {!isRR && (
+          <p className="text-[#4b5563] text-xs mt-1 capitalize">
+            {session.skill_filter === 'all' ? 'All skill levels welcome' : `${session.skill_filter} players only`}
+            {session.player_cap && ` · ${playerCount}/${session.player_cap} registered`}
+          </p>
+        )}
+        {isRR && (
+          <p className="text-[#4b5563] text-xs mt-1">
+            Team tournament · {session.player_cap ? `${playerCount}/${session.player_cap} teams` : 'open team registration'}
+          </p>
+        )}
       </div>
 
       {isFull ? (
         <div className="w-full max-w-lg bg-[#1a1010] border border-red-500/20 rounded-2xl p-8 text-center">
           <div className="text-4xl mb-3">😔</div>
           <p className="text-white font-black text-lg mb-2">Session is full</p>
-          <p className="text-[#6b7280] text-sm">This session has reached its player cap. Check back for future sessions.</p>
+          <p className="text-[#6b7280] text-sm">This session has reached its cap. Check back for future sessions.</p>
+        </div>
+      ) : isRR ? (
+        /* ── Round-Robin team registration form ── */
+        <div className="w-full max-w-lg">
+          <h1 className="text-2xl font-black text-white mb-1">Register Your Team</h1>
+          <p className="text-[#6b7280] text-sm mb-6">Enter both player names to register as a team for this Round-Robin.</p>
+
+          <div className="space-y-4 mb-6">
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-[#6b7280] mb-1.5">Player 1 (You)</label>
+              <input
+                value={p1Name}
+                onChange={e => setP1Name(e.target.value)}
+                placeholder={currentUser?.name ?? 'Your name'}
+                className="w-full bg-[#1f2d22] border border-[#374151] text-white placeholder-[#4b5563] rounded-xl px-4 py-3 text-sm focus:border-[#00694c] focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-[#6b7280] mb-1.5">Player 2 (Partner)</label>
+              <input
+                value={p2Name}
+                onChange={e => setP2Name(e.target.value)}
+                placeholder="Your partner's name"
+                className="w-full bg-[#1f2d22] border border-[#374151] text-white placeholder-[#4b5563] rounded-xl px-4 py-3 text-sm focus:border-[#00694c] focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-[#6b7280] mb-1.5">Team email (optional — for live updates)</label>
+              <input
+                type="email"
+                value={teamEmail}
+                onChange={e => setTeamEmail(e.target.value)}
+                placeholder={currentUser?.email ?? 'contact@email.com'}
+                className="w-full bg-[#1f2d22] border border-[#374151] text-white placeholder-[#4b5563] rounded-xl px-4 py-3 text-sm focus:border-[#00694c] focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {error && (
+            <div className="bg-red-900/20 border border-red-500/30 rounded-xl px-4 py-3 mb-4 text-red-400 text-sm">{error}</div>
+          )}
+
+          <button
+            onClick={handleSubmitRR}
+            disabled={submitting}
+            className="w-full bg-[#00694c] hover:bg-[#005a40] disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm uppercase tracking-wider py-4 rounded-xl transition-colors">
+            {submitting ? 'Registering Team…' : 'Register Team →'}
+          </button>
+          {!currentUser && (
+            <button onClick={onOpenLogin} className="w-full mt-3 text-[#00694c] text-xs hover:underline text-center block">
+              Have an account? Login to link your results →
+            </button>
+          )}
         </div>
       ) : (
+        /* ── Rotation individual registration form ── */
         <div className="w-full max-w-lg">
           <h1 className="text-2xl font-black text-white mb-1">Register for Open Play</h1>
           {currentUser ? (
@@ -262,7 +365,6 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
             </div>
           )}
 
-          {/* Skill tier */}
           <p className="text-[10px] font-black uppercase tracking-widest text-[#6b7280] mb-3">Select your skill level</p>
           <div className="space-y-3 mb-6">
             {TIER_INFO.map(t => {
@@ -289,11 +391,11 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
             })}
           </div>
 
-          {/* Wait time advisory */}
-          {waitingCount >= 4 && (() => {
-            const gamesAhead = Math.floor(waitingCount / 4);
-            const minsLow = gamesAhead * 12;
-            const minsHigh = gamesAhead * 18;
+          {/* Wait time advisory — uses centralized constants */}
+          {waitingCount >= PLAYERS_PER_MATCH && (() => {
+            const gamesAhead = Math.floor(waitingCount / PLAYERS_PER_MATCH);
+            const minsLow = gamesAhead * MINS_PER_GAME_LOW;
+            const minsHigh = gamesAhead * MINS_PER_GAME_HIGH;
             return (
               <div className="bg-amber-900/20 border border-amber-500/30 rounded-xl px-4 py-3 mb-4 flex items-start gap-3">
                 <span className="text-amber-400 text-lg leading-none mt-0.5">⏱</span>
@@ -313,12 +415,11 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
           )}
 
           <button
-            onClick={handleSubmit}
+            onClick={handleSubmitRotation}
             disabled={!tier || submitting}
             className="w-full bg-[#00694c] hover:bg-[#005a40] disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm uppercase tracking-wider py-4 rounded-xl transition-colors">
             {submitting ? 'Registering…' : 'Register Now →'}
           </button>
-
           <p className="text-center text-[#374151] text-xs mt-4">Show up at the court and the admin will add you to the active pool.</p>
         </div>
       )}

@@ -29,6 +29,26 @@ interface OPReg {
     skill_filter: string;
     status: string;
     court_name?: string;
+    session_type?: 'rotation' | 'round_robin';
+  };
+}
+
+interface OPTeam {
+  id: string;
+  session_id: string;
+  player1_name: string;
+  player2_name: string;
+  email: string | null;
+  wins: number;
+  losses: number;
+  points_for: number;
+  points_against: number;
+  session?: {
+    date: string;
+    start_time: string;
+    end_time: string;
+    status: string;
+    court_name?: string;
   };
 }
 
@@ -47,6 +67,7 @@ export default function BookingsHistory({
   const [supabaseBookings, setSupabaseBookings] = useState<Booking[] | null>(null);
   const [isFetching, setIsFetching] = useState(false);
   const [openPlayRegs, setOpenPlayRegs] = useState<OPReg[]>([]);
+  const [rrTeams, setRRTeams] = useState<OPTeam[]>([]);
   const [opFetching, setOpFetching] = useState(false);
 
   useEffect(() => {
@@ -105,15 +126,29 @@ export default function BookingsHistory({
         .select('id, session_id, skill_tier, status, registered_at, games_played, consecutive_wins')
         .eq('player_email', currentUser.email)
         .order('registered_at', { ascending: false }),
-      supabase.from('open_play_sessions').select('id, date, start_time, end_time, skill_filter, status, court_id'),
+      supabase.from('open_play_teams')
+        .select('id, session_id, player1_name, player2_name, email, wins, losses, points_for, points_against')
+        .eq('email', currentUser.email)
+        .order('created_at', { ascending: false }),
+      supabase.from('open_play_sessions').select('id, date, start_time, end_time, skill_filter, status, court_id, session_type'),
       supabase.from('courts').select('id, name'),
-    ]).then(([{ data: regs }, { data: sessions }, { data: courts }]) => {
+    ]).then(([{ data: regs }, { data: teams }, { data: sessions }, { data: courts }]) => {
       if (regs) {
         setOpenPlayRegs(regs.map((r: any) => {
           const sess = sessions?.find((s: any) => s.id === r.session_id);
           const court = courts?.find((c: any) => c.id === sess?.court_id);
           return {
             ...r,
+            session: sess ? { ...sess, court_name: court?.name ?? `Court ${sess.court_id}` } : undefined,
+          };
+        }));
+      }
+      if (teams) {
+        setRRTeams(teams.map((t: any) => {
+          const sess = sessions?.find((s: any) => s.id === t.session_id);
+          const court = courts?.find((c: any) => c.id === sess?.court_id);
+          return {
+            ...t,
             session: sess ? { ...sess, court_name: court?.name ?? `Court ${sess.court_id}` } : undefined,
           };
         }));
@@ -278,9 +313,9 @@ export default function BookingsHistory({
               mainTab === 'openplay' ? 'bg-[#00694c] text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}>
             <Swords className="w-3.5 h-3.5" /> Open Play
-            {openPlayRegs.length > 0 && (
+            {(openPlayRegs.length + rrTeams.length) > 0 && (
               <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${mainTab === 'openplay' ? 'bg-white/20 text-white' : 'bg-[#00694c]/10 text-[#00694c]'}`}>
-                {openPlayRegs.length}
+                {openPlayRegs.length + rrTeams.length}
               </span>
             )}
           </button>
@@ -293,7 +328,7 @@ export default function BookingsHistory({
               <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center">
                 <RefreshCw className="w-6 h-6 text-[#00694c] animate-spin mx-auto" />
               </div>
-            ) : openPlayRegs.length === 0 ? (
+            ) : (openPlayRegs.length === 0 && rrTeams.length === 0) ? (
               <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center max-w-md mx-auto space-y-4">
                 <Swords className="w-12 h-12 text-slate-300 mx-auto" />
                 <h3 className="font-bold text-slate-900">No Open Play registrations</h3>
@@ -305,7 +340,70 @@ export default function BookingsHistory({
                 </button>
               </div>
             ) : (
-              openPlayRegs.map((reg) => {
+              <>
+              {/* Round-Robin teams */}
+              {rrTeams.map((team) => {
+                const s = team.session;
+                const isActive = s?.status === 'active';
+                const isEnded = s?.status === 'ended';
+                const diff = team.points_for - team.points_against;
+                return (
+                  <div key={team.id} className="bg-white rounded-2xl border border-purple-200 shadow-sm overflow-hidden">
+                    <div className={`h-1 ${isActive ? 'bg-red-500' : isEnded ? 'bg-slate-300' : 'bg-purple-400'}`} />
+                    <div className="p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                          {isActive && (
+                            <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest bg-red-500/10 text-red-600 border border-red-200 px-2 py-0.5 rounded-full">
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />Live Now
+                            </span>
+                          )}
+                          {isEnded && <span className="text-[9px] font-black uppercase bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Ended</span>}
+                          {!isActive && !isEnded && <span className="text-[9px] font-black uppercase bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Upcoming</span>}
+                          <span className="text-[9px] font-black uppercase bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">🔵 Round-Robin</span>
+                        </div>
+                        <p className="font-extrabold text-slate-900 text-base">{s?.court_name ?? 'Open Play'}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{s?.date} · {s?.start_time?.slice(0,5)}–{s?.end_time?.slice(0,5)}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Team: <span className="font-bold text-slate-700">{team.player1_name} &amp; {team.player2_name}</span>
+                        </p>
+                      </div>
+                      {(team.wins + team.losses) > 0 && (
+                        <div className="flex gap-4 text-center shrink-0">
+                          <div>
+                            <p className="text-2xl font-black text-[#00694c]">{team.wins}W</p>
+                            <p className="text-[9px] font-mono uppercase text-slate-400">Wins</p>
+                          </div>
+                          <div>
+                            <p className="text-2xl font-black text-slate-500">{team.losses}L</p>
+                            <p className="text-[9px] font-mono uppercase text-slate-400">Losses</p>
+                          </div>
+                          <div>
+                            <p className={`text-2xl font-black ${diff >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                              {diff >= 0 ? '+' : ''}{diff}
+                            </p>
+                            <p className="text-[9px] font-mono uppercase text-slate-400">Pt Diff</p>
+                          </div>
+                        </div>
+                      )}
+                      <div className="shrink-0">
+                        {isActive ? (
+                          <a href="/open-play/live"
+                            className="flex items-center gap-1.5 bg-[#00694c] text-white text-xs font-black px-4 py-2.5 rounded-xl hover:bg-[#005a40] transition-colors">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />Watch Live
+                          </a>
+                        ) : !isEnded ? (
+                          <span className="text-xs text-slate-400 font-semibold">See you on {s?.date}!</span>
+                        ) : (
+                          <span className="text-xs text-slate-300 font-semibold">Tournament ended</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {/* Rotation registrations */}
+              {openPlayRegs.map((reg) => {
                 const s = reg.session;
                 const isActive = s?.status === 'active';
                 const isEnded = s?.status === 'ended';
@@ -368,7 +466,8 @@ export default function BookingsHistory({
                     </div>
                   </div>
                 );
-              })
+              })}
+              </>
             )}
           </div>
         ) : (

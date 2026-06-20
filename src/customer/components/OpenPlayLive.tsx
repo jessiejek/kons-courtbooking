@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseEnabled } from '../../lib/supabase';
-import { makeMatch } from '../../lib/openPlayMatchmaking';
+import { makeMatch, sortStandings, ANNOUNCEMENT_MS, PLAYERS_PER_MATCH } from '../../lib/openPlayMatchmaking';
+import type { BalanceMode } from '../../lib/openPlayMatchmaking';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,8 @@ interface OPSession {
   skill_filter: string;
   max_score: number;
   status: string;
+  session_type: 'rotation' | 'round_robin';
+  skill_balance_mode: BalanceMode;
 }
 
 interface OPRegistration {
@@ -36,6 +39,24 @@ interface OPGame {
   server_index: number;
   status: 'rally' | 'active' | 'ended';
   winner_team: 'A' | 'B' | null;
+  rr_team_a_name?: string | null;
+  rr_team_b_name?: string | null;
+}
+
+interface OPTeam {
+  id: string;
+  player1_name: string;
+  player2_name: string;
+  wins: number;
+  losses: number;
+  points_for: number;
+  points_against: number;
+}
+
+interface OPRRMatch {
+  id: string;
+  round_number: number;
+  status: 'pending' | 'active' | 'ended' | 'bye';
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -70,8 +91,6 @@ function Clock() {
   );
 }
 
-// ─── Main ────────────────────────────────────────────────────────────────────
-
 interface WinnerAnnouncement {
   winnerTeam: 'A' | 'B';
   winnerNames: string[];
@@ -79,27 +98,40 @@ interface WinnerAnnouncement {
   scoreB: number;
 }
 
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
 export default function OpenPlayLive() {
   const [sessions, setSessions] = useState<OPSession[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [registrations, setRegistrations] = useState<OPRegistration[]>([]);
   const [activeGame, setActiveGame] = useState<OPGame | null>(null);
+  const [rrTeams, setRRTeams] = useState<OPTeam[]>([]);
+  const [rrMatches, setRRMatches] = useState<OPRRMatch[]>([]);
   const [loading, setLoading] = useState(true);
-  // Fix F: transient winner announcement state, auto-clears after 8 seconds
+  // Fix F: transient winner announcement state, auto-clears after ANNOUNCEMENT_MS
   const [announcement, setAnnouncement] = useState<WinnerAnnouncement | null>(null);
 
   const session = sessions.find(s => s.id === selectedId);
+  const isRR = session?.session_type === 'round_robin';
+
   const waitingPool = registrations.filter(r => r.status === 'waiting');
   // Fix G: compute "Up Next" from the waiting pool using the same makeMatch logic.
-  // Only shown when there's no active game (i.e. between matches).
-  const balanceMode = (session as any)?.skill_balance_mode ?? 'arrival_order';
-  const upNextMatch = !activeGame && waitingPool.length >= 4
-    ? makeMatch(waitingPool, balanceMode)
+  const upNextMatch = !isRR && !activeGame && waitingPool.length >= PLAYERS_PER_MATCH
+    ? makeMatch(waitingPool, session?.skill_balance_mode ?? 'arrival_order')
     : null;
+
   const leaderboard = [...registrations]
     .filter(r => r.games_played > 0)
     .sort((a, b) => b.consecutive_wins - a.consecutive_wins || b.games_played - a.games_played)
     .slice(0, 6);
+
+  const rrStandings: OPTeam[] = sortStandings(rrTeams);
+  const totalRRMatches = rrMatches.filter(m => m.status !== 'bye').length;
+  const endedRRMatches = rrMatches.filter(m => m.status === 'ended').length;
+  const currentRound = rrMatches.find(m => m.status === 'active')?.round_number
+    ?? (rrMatches.filter(m => m.status === 'ended').at(-1)?.round_number ?? 0);
+  const totalRounds = Math.max(...rrMatches.map(m => m.round_number), 0);
+  const rrComplete = isRR && rrMatches.length > 0 && rrMatches.filter(m => m.status === 'pending').length === 0;
 
   const getPlayer = (id: string) => registrations.find(r => r.id === id);
 
@@ -125,58 +157,78 @@ export default function OpenPlayLive() {
   const loadData = useCallback(async () => {
     if (!selectedId || !isSupabaseEnabled || !supabase) return;
     const [{ data: regs }, { data: games }] = await Promise.all([
-      supabase.from('open_play_registrations').select('*').eq('session_id', selectedId).order('entered_pool_at').order('id', { ascending: true }), // Fix D
+      supabase.from('open_play_registrations').select('*').eq('session_id', selectedId).order('entered_pool_at').order('id', { ascending: true }),
       supabase.from('open_play_games').select('*').eq('session_id', selectedId).in('status', ['rally', 'active']).order('started_at', { ascending: false }),
     ]);
     if (regs) setRegistrations(regs);
-    if (games) {
-      setActiveGame(games[0] ?? null);
-      // Fix G: nextGame was read from games[1] which is always null (single-active-game guard).
-      // Now computed from the waiting pool directly (see upNextMatch below).
-    }
+    if (games) setActiveGame(games[0] ?? null);
+  }, [selectedId]);
+
+  const loadRRData = useCallback(async () => {
+    if (!selectedId || !isSupabaseEnabled || !supabase) return;
+    const [{ data: teams }, { data: matches }] = await Promise.all([
+      supabase.from('open_play_teams').select('*').eq('session_id', selectedId).order('created_at'),
+      supabase.from('open_play_rr_matches').select('*').eq('session_id', selectedId).order('round_number').order('id'),
+    ]);
+    if (teams) setRRTeams(teams);
+    if (matches) setRRMatches(matches);
   }, [selectedId]);
 
   useEffect(() => { loadSessions(); }, []);
-  useEffect(() => { if (selectedId) loadData(); }, [selectedId]);
+  useEffect(() => { if (selectedId) { loadData(); loadRRData(); } }, [selectedId]);
 
   // Realtime subscriptions
   useEffect(() => {
     if (!selectedId || !isSupabaseEnabled || !supabase) return;
 
-    const gameChannel = supabase
-      .channel(`live-game-${selectedId}`)
+    const ch = supabase
+      .channel(`live-all-${selectedId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'open_play_games', filter: `session_id=eq.${selectedId}` },
         (payload: any) => {
-          // Fix F: detect game-end transition and show winner announcement for 8s
+          // Fix F: detect game-end transition and show winner announcement for ANNOUNCEMENT_MS
           if (payload.eventType === 'UPDATE' &&
               payload.new?.status === 'ended' &&
               payload.old?.status !== 'ended' &&
               payload.new?.winner_team) {
             const winner: 'A' | 'B' = payload.new.winner_team;
-            const winnerIds: string[] = winner === 'A' ? payload.new.team_a : payload.new.team_b;
-            // Look up names from current registrations snapshot
-            setRegistrations(currentRegs => {
-              const names = winnerIds.map(
-                (id: string) => currentRegs.find(r => r.id === id)?.player_name ?? 'Player'
-              );
+            // RR: use stored team name strings
+            if (payload.new.rr_team_a_name || payload.new.rr_team_b_name) {
+              const winnerName = winner === 'A' ? payload.new.rr_team_a_name : payload.new.rr_team_b_name;
               setAnnouncement({
                 winnerTeam: winner,
-                winnerNames: names,
+                winnerNames: [winnerName ?? 'Team'],
                 scoreA: payload.new.score_a,
                 scoreB: payload.new.score_b,
               });
-              return currentRegs;
-            });
-            setTimeout(() => setAnnouncement(null), 8000);
+            } else {
+              const winnerIds: string[] = winner === 'A' ? payload.new.team_a : payload.new.team_b;
+              setRegistrations(currentRegs => {
+                const names = winnerIds.map(
+                  (id: string) => currentRegs.find(r => r.id === id)?.player_name ?? 'Player'
+                );
+                setAnnouncement({
+                  winnerTeam: winner,
+                  winnerNames: names,
+                  scoreA: payload.new.score_a,
+                  scoreB: payload.new.score_b,
+                });
+                return currentRegs;
+              });
+            }
+            setTimeout(() => setAnnouncement(null), ANNOUNCEMENT_MS);
           }
           loadData();
         })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'open_play_registrations', filter: `session_id=eq.${selectedId}` },
         () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'open_play_teams', filter: `session_id=eq.${selectedId}` },
+        () => loadRRData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'open_play_rr_matches', filter: `session_id=eq.${selectedId}` },
+        () => loadRRData())
       .subscribe();
 
-    return () => { supabase.removeChannel(gameChannel); };
-  }, [selectedId, loadData]);
+    return () => { supabase.removeChannel(ch); };
+  }, [selectedId, loadData, loadRRData]);
 
   const getSide = (game: OPGame) => {
     const score = game.serving_team === 'A' ? game.score_a : game.score_b;
@@ -184,7 +236,7 @@ export default function OpenPlayLive() {
   };
 
   const getServerName = (game: OPGame) => {
-    if (!game.serving_team) return null;
+    if (!game.serving_team || game.rr_team_a_name) return null;
     const ids = game.serving_team === 'A' ? game.team_a : game.team_b;
     return getPlayer(ids[game.server_index])?.player_name ?? null;
   };
@@ -206,10 +258,10 @@ export default function OpenPlayLive() {
   return (
     <div className="min-h-screen bg-[#0a1a12] text-white p-4 lg:p-6">
 
-      {/* Fix F: Winner announcement overlay — auto-dismisses after 8 seconds */}
+      {/* Fix F: Winner announcement overlay */}
       {announcement && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-gradient-to-b from-[#0d2418] to-[#0a1a12] border-2 border-[#00694c] rounded-3xl p-10 text-center max-w-sm w-full mx-4 shadow-2xl animate-pulse-once">
+          <div className="bg-gradient-to-b from-[#0d2418] to-[#0a1a12] border-2 border-[#00694c] rounded-3xl p-10 text-center max-w-sm w-full mx-4 shadow-2xl">
             <div className="text-6xl mb-3">🏅</div>
             <p className="text-[10px] font-black uppercase tracking-widest text-[#00694c] mb-2">Game Over</p>
             <p className="text-4xl font-black text-white mb-1">
@@ -223,6 +275,36 @@ export default function OpenPlayLive() {
         </div>
       )}
 
+      {/* RR Champion overlay */}
+      {isRR && rrComplete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="bg-gradient-to-b from-amber-900/40 to-[#0a1a12] border-2 border-amber-500 rounded-3xl p-10 text-center max-w-sm w-full mx-4 shadow-2xl">
+            <div className="text-6xl mb-3 animate-bounce">🏆</div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-amber-400 mb-1">Round-Robin Complete</p>
+            <p className="text-2xl font-black text-white mb-3">CHAMPION</p>
+            {rrStandings[0] && (
+              <p className="text-amber-300 font-black text-xl mb-1">
+                {rrStandings[0].player1_name} & {rrStandings[0].player2_name}
+              </p>
+            )}
+            {rrStandings[0] && (
+              <p className="text-amber-400/70 text-sm mb-6">{rrStandings[0].wins}W – {rrStandings[0].losses}L</p>
+            )}
+            <div className="space-y-2 text-left">
+              {rrStandings.map((t, i) => (
+                <div key={t.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-[#374151] w-4">{i + 1}</span>
+                    <span className="text-sm font-semibold text-[#d1d5db]">{t.player1_name} & {t.player2_name}</span>
+                  </div>
+                  <span className="text-xs font-bold text-[#00694c]">{t.wins}W–{t.losses}L</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
@@ -230,7 +312,6 @@ export default function OpenPlayLive() {
           <div className="font-black text-lg text-white">Open Play Live</div>
         </div>
         <div className="flex items-center gap-4">
-          {/* Session switcher */}
           {sessions.length > 1 && (
             <div className="flex gap-2">
               {sessions.map(s => (
@@ -270,6 +351,11 @@ export default function OpenPlayLive() {
                     <span className="text-[10px] font-black uppercase tracking-widest text-[#00694c]">
                       {session.court_name} · Match in Progress
                     </span>
+                    {isRR && (
+                      <span className="text-[9px] font-black text-purple-400 bg-purple-900/30 px-1.5 py-0.5 rounded">
+                        Round {activeGame.rr_team_a_name ? rrMatches.find(m => m.status === 'active')?.round_number : ''}
+                      </span>
+                    )}
                   </div>
                   <span className="text-[10px] text-[#4b5563] font-bold">First to {session.max_score} · Win by 2</span>
                 </div>
@@ -283,22 +369,26 @@ export default function OpenPlayLive() {
                         <span className="text-[8px] font-black bg-[#00694c] text-white px-1.5 py-0.5 rounded">SERVING</span>
                       )}
                     </div>
-                    {activeGame.team_a.map((id, i) => {
-                      const p = getPlayer(id);
-                      const isServer = activeGame.serving_team === 'A' && activeGame.server_index === i;
-                      return p ? (
-                        <div key={id} className="mb-2">
-                          <div className="flex items-center gap-2">
-                            <TierDot tier={p.skill_tier} size="lg" />
-                            <span className={`font-bold text-sm ${isServer ? 'text-[#00ff88]' : 'text-white'}`}>{p.player_name}</span>
-                            {isServer && <span className="text-xs">🏓</span>}
+                    {activeGame.rr_team_a_name ? (
+                      <p className="font-bold text-sm text-white">{activeGame.rr_team_a_name}</p>
+                    ) : (
+                      activeGame.team_a.map((id, i) => {
+                        const p = getPlayer(id);
+                        const isServer = activeGame.serving_team === 'A' && activeGame.server_index === i;
+                        return p ? (
+                          <div key={id} className="mb-2">
+                            <div className="flex items-center gap-2">
+                              <TierDot tier={p.skill_tier} size="lg" />
+                              <span className={`font-bold text-sm ${isServer ? 'text-[#00ff88]' : 'text-white'}`}>{p.player_name}</span>
+                              {isServer && <span className="text-xs">🏓</span>}
+                            </div>
+                            {isServer && (
+                              <div className="ml-5 text-[9px] text-[#00694c] font-bold mt-0.5">{getSide(activeGame)} side</div>
+                            )}
                           </div>
-                          {isServer && (
-                            <div className="ml-5 text-[9px] text-[#00694c] font-bold mt-0.5">{getSide(activeGame)} side</div>
-                          )}
-                        </div>
-                      ) : null;
-                    })}
+                        ) : null;
+                      })
+                    )}
                   </div>
 
                   {/* Score */}
@@ -320,26 +410,29 @@ export default function OpenPlayLive() {
                       )}
                       <span className="text-[9px] font-black uppercase tracking-widest text-[#4b5563]">Team B</span>
                     </div>
-                    {activeGame.team_b.map((id, i) => {
-                      const p = getPlayer(id);
-                      const isServer = activeGame.serving_team === 'B' && activeGame.server_index === i;
-                      return p ? (
-                        <div key={id} className="mb-2 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {isServer && <span className="text-xs">🏓</span>}
-                            <span className={`font-bold text-sm ${isServer ? 'text-[#00ff88]' : 'text-white'}`}>{p.player_name}</span>
-                            <TierDot tier={p.skill_tier} size="lg" />
+                    {activeGame.rr_team_b_name ? (
+                      <p className="font-bold text-sm text-white text-right">{activeGame.rr_team_b_name}</p>
+                    ) : (
+                      activeGame.team_b.map((id, i) => {
+                        const p = getPlayer(id);
+                        const isServer = activeGame.serving_team === 'B' && activeGame.server_index === i;
+                        return p ? (
+                          <div key={id} className="mb-2 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {isServer && <span className="text-xs">🏓</span>}
+                              <span className={`font-bold text-sm ${isServer ? 'text-[#00ff88]' : 'text-white'}`}>{p.player_name}</span>
+                              <TierDot tier={p.skill_tier} size="lg" />
+                            </div>
+                            {isServer && (
+                              <div className="mr-5 text-[9px] text-[#00694c] font-bold mt-0.5">{getSide(activeGame)} side</div>
+                            )}
                           </div>
-                          {isServer && (
-                            <div className="mr-5 text-[9px] text-[#00694c] font-bold mt-0.5">{getSide(activeGame)} side</div>
-                          )}
-                        </div>
-                      ) : null;
-                    })}
+                        ) : null;
+                      })
+                    )}
                   </div>
                 </div>
 
-                {/* Server info bar */}
                 {activeGame.status === 'active' && getServerName(activeGame) && (
                   <div className="px-5 py-2 border-t border-[#1f2d22] text-center text-xs text-[#6b7280] font-semibold">
                     🏓 <span className="text-[#00ff88] font-bold">{getServerName(activeGame)}</span> is serving from the <span className="text-white font-bold">{getSide(activeGame)}</span> side
@@ -353,13 +446,35 @@ export default function OpenPlayLive() {
               </div>
             ) : (
               <div className="bg-[#111c15] border border-[#1f2d22] rounded-2xl p-10 text-center">
-                <div className="text-4xl mb-3">⏳</div>
-                <p className="text-white font-black mb-1">Preparing Next Match</p>
-                <p className="text-[#4b5563] text-sm">Stand by…</p>
+                <div className="text-4xl mb-3">{rrComplete ? '🏆' : '⏳'}</div>
+                <p className="text-white font-black mb-1">{rrComplete ? 'Tournament Complete!' : 'Preparing Next Match'}</p>
+                <p className="text-[#4b5563] text-sm">{rrComplete ? 'See final standings →' : 'Stand by…'}</p>
               </div>
             )}
 
-            {/* Fix G: Up Next — computed from waiting pool, not from dead games[1] */}
+            {/* RR Schedule Progress */}
+            {isRR && rrMatches.length > 0 && (
+              <div className="bg-[#111c15] border border-[#1f2d22] rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-purple-400">📋 Schedule Progress</span>
+                  <span className="text-xs text-[#4b5563]">Round {currentRound} / {totalRounds}</span>
+                </div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-bold text-white">
+                    Match {endedRRMatches} of {totalRRMatches}
+                  </span>
+                  <span className="text-xs text-[#00694c] font-bold">
+                    {totalRRMatches > 0 ? Math.round((endedRRMatches / totalRRMatches) * 100) : 0}%
+                  </span>
+                </div>
+                <div className="w-full bg-[#1f2d22] rounded-full h-2">
+                  <div className="bg-[#00694c] h-2 rounded-full transition-all"
+                    style={{ width: `${totalRRMatches > 0 ? (endedRRMatches / totalRRMatches) * 100 : 0}%` }} />
+                </div>
+              </div>
+            )}
+
+            {/* Fix G: Up Next — computed from waiting pool (rotation only) */}
             {upNextMatch && (
               <div className="bg-[#111c15] border border-[#1d4ed820] rounded-2xl p-4">
                 <div className="flex items-center justify-between mb-3">
@@ -393,39 +508,67 @@ export default function OpenPlayLive() {
             )}
           </div>
 
-          {/* RIGHT: Pool + Leaderboard */}
+          {/* RIGHT: Pool / Standings / Leaderboard */}
           <div className="space-y-4">
 
-            {/* Waiting Pool */}
-            <div className="bg-[#111c15] border border-[#1f2d22] rounded-2xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] font-black uppercase tracking-widest text-[#6b7280]">⏳ Waiting Pool</span>
-                <span className="text-xs font-black text-[#00694c] bg-[#00694c20] px-2 py-0.5 rounded-full">{waitingPool.length}</span>
-              </div>
-              {waitingPool.length === 0 ? (
-                <p className="text-xs text-[#4b5563] text-center py-3">All players on court</p>
-              ) : (
-                <div className="space-y-2">
-                  {waitingPool.map((r, i) => (
-                    <div key={r.id} className="flex items-center justify-between bg-[#0d1710] rounded-lg px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-black text-[#374151] w-4">#{i + 1}</span>
-                        <TierDot tier={r.skill_tier} />
-                        <span className="text-sm font-semibold text-[#d1d5db]">{r.player_name}</span>
-                      </div>
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                        r.skill_tier === 'pro' ? 'bg-amber-900/40 text-amber-400' :
-                        r.skill_tier === 'intermediate' ? 'bg-blue-900/40 text-blue-400' :
-                        'bg-green-900/40 text-green-400'
-                      }`}>{TIER_LABEL[r.skill_tier]}</span>
-                    </div>
-                  ))}
+            {/* Rotation: Waiting Pool */}
+            {!isRR && (
+              <div className="bg-[#111c15] border border-[#1f2d22] rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-[#6b7280]">⏳ Waiting Pool</span>
+                  <span className="text-xs font-black text-[#00694c] bg-[#00694c20] px-2 py-0.5 rounded-full">{waitingPool.length}</span>
                 </div>
-              )}
-            </div>
+                {waitingPool.length === 0 ? (
+                  <p className="text-xs text-[#4b5563] text-center py-3">All players on court</p>
+                ) : (
+                  <div className="space-y-2">
+                    {waitingPool.map((r, i) => (
+                      <div key={r.id} className="flex items-center justify-between bg-[#0d1710] rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-black text-[#374151] w-4">#{i + 1}</span>
+                          <TierDot tier={r.skill_tier} />
+                          <span className="text-sm font-semibold text-[#d1d5db]">{r.player_name}</span>
+                        </div>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          r.skill_tier === 'pro' ? 'bg-amber-900/40 text-amber-400' :
+                          r.skill_tier === 'intermediate' ? 'bg-blue-900/40 text-blue-400' :
+                          'bg-green-900/40 text-green-400'
+                        }`}>{TIER_LABEL[r.skill_tier]}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
-            {/* Leaderboard */}
-            {leaderboard.length > 0 && (
+            {/* RR: Live Standings */}
+            {isRR && rrStandings.length > 0 && (
+              <div className="bg-[#111c15] border border-[#f59e0b20] rounded-2xl p-4">
+                <div className="text-[10px] font-black uppercase tracking-widest text-amber-400 mb-3">🏆 Standings</div>
+                <div className="space-y-2.5">
+                  {rrStandings.map((t, i) => {
+                    const diff = t.points_for - t.points_against;
+                    return (
+                      <div key={t.id} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-black text-[#374151] w-4">{i + 1}</span>
+                          <span className="text-sm font-semibold text-[#d1d5db]">{t.player1_name} & {t.player2_name}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs font-black text-[#00694c]">{t.wins}W–{t.losses}L</span>
+                          <span className={`text-[10px] ml-1 ${diff >= 0 ? 'text-green-500' : 'text-red-400'}`}>
+                            ({diff >= 0 ? '+' : ''}{diff})
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Rotation Leaderboard */}
+            {!isRR && leaderboard.length > 0 && (
               <div className="bg-[#111c15] border border-[#f59e0b20] rounded-2xl p-4">
                 <div className="text-[10px] font-black uppercase tracking-widest text-amber-400 mb-3">🏆 Today's Leaders</div>
                 <div className="space-y-2.5">
@@ -448,8 +591,9 @@ export default function OpenPlayLive() {
               <div className="text-[10px] font-black uppercase tracking-widest text-[#6b7280] mb-2">Session</div>
               <p className="text-sm font-bold text-white">{session.court_name}</p>
               <p className="text-xs text-[#4b5563] mt-1">{session.date} · {session.start_time.slice(0,5)} – {session.end_time.slice(0,5)}</p>
-              <p className="text-xs text-[#4b5563] capitalize mt-0.5">
-                {session.skill_filter === 'all' ? 'All levels welcome' : `${session.skill_filter} only`} · First to 11 (deuce cap {session.max_score})
+              <p className="text-xs text-[#4b5563] mt-0.5 capitalize">
+                {session.session_type === 'round_robin' ? '🔵 Round-Robin Tournament' : '🟢 Rotation'}
+                {session.session_type === 'rotation' && ` · First to 11 (cap ${session.max_score})`}
               </p>
             </div>
           </div>

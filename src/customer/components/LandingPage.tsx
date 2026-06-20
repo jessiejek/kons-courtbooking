@@ -41,7 +41,7 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dismissedAnnouncements, setDismissedAnnouncements] = useState<Set<string>>(new Set());
   const [liveCourts, setLiveCourts] = useState<LiveCourt[]>([]);
-  const [openPlaySessions, setOpenPlaySessions] = useState<{ id: string; court_name: string; date: string; start_time: string; end_time: string; skill_filter: string; status: string }[]>([]);
+  const [openPlaySessions, setOpenPlaySessions] = useState<{ id: string; court_name: string; date: string; start_time: string; end_time: string; skill_filter: string; status: string; session_type: 'rotation' | 'round_robin' }[]>([]);
   const [openPlayIndex, setOpenPlayIndex] = useState(0);
   const [openPlayDismissed, setOpenPlayDismissed] = useState(false);
   const openPlaySession = openPlaySessions[openPlayIndex] ?? null;
@@ -58,7 +58,7 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
     if (!isSupabaseEnabled || !supabase) return;
     Promise.all([
       supabase.from('open_play_sessions')
-        .select('id, court_id, date, start_time, end_time, skill_filter, status')
+        .select('id, court_id, date, start_time, end_time, skill_filter, status, session_type')
         .in('status', ['upcoming', 'active'])
         .order('status', { ascending: true }) // active first
         .order('date', { ascending: true }),
@@ -277,8 +277,10 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
                     </span>
                   )}
                   <span className="text-sm font-semibold truncate">
+                    <span className="shrink-0 font-black text-[9px] uppercase tracking-widest bg-white/20 px-2 py-0.5 rounded mr-2">Open Play</span>
                     🏓 {s.court_name} · {s.start_time.slice(0,5)}–{s.end_time.slice(0,5)}
-                    <span className="ml-2 opacity-60 text-xs capitalize">{s.skill_filter === 'all' ? 'All levels' : s.skill_filter}</span>
+                    <span className="ml-2 opacity-60 text-xs capitalize">{s.session_type === 'round_robin' ? 'Round-Robin' : 'Rotation'}</span>
+                    {s.session_type === 'rotation' && s.skill_filter !== 'all' && <span className="ml-1 opacity-60 text-xs capitalize">· {s.skill_filter}</span>}
                   </span>
                 </div>
                 <div className="shrink-0">
@@ -355,11 +357,14 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
                     <div className="flex items-center gap-2 mb-0.5">
                       <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${s.status === 'active' ? 'bg-red-400' : 'bg-[#00ff88]'}`} />
                       <span className="text-[10px] font-black uppercase tracking-widest text-[#00ff88]">
-                        {s.status === 'active' ? 'Live Now' : s.date}
+                        Open Play · {s.status === 'active' ? 'Live Now' : s.date}
                       </span>
                     </div>
                     <p className="text-white font-bold text-sm truncate">{s.court_name} · {s.start_time.slice(0,5)}–{s.end_time.slice(0,5)}</p>
-                    <p className="text-white/60 text-xs capitalize">{s.skill_filter === 'all' ? 'All levels' : `${s.skill_filter} only`}</p>
+                    <p className="text-white/60 text-xs capitalize">
+                      {s.session_type === 'round_robin' ? 'Round-Robin' : 'Rotation'}
+                      {s.session_type === 'rotation' && s.skill_filter !== 'all' && ` · ${s.skill_filter} only`}
+                    </p>
                   </div>
                   {s.status === 'active' ? (
                     <a href="/open-play/live"
