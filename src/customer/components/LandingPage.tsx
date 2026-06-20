@@ -261,63 +261,54 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
       )}
 
       {/* ── OPEN PLAY BANNER ───────────────────────────────────── */}
-      {openPlaySessions.length > 0 && !openPlayDismissed && openPlaySession && (
+      {openPlaySessions.length > 0 && !openPlayDismissed && (
         <div className="fixed top-[72px] left-0 right-0 z-39 bg-[#00694c] text-white">
-          {/* Court tabs — only show when multiple sessions */}
-          {openPlaySessions.length > 1 && (
-            <div className="flex border-b border-white/10 px-5 gap-1 pt-1">
-              {openPlaySessions.map((s, i) => (
-                <button
-                  key={s.id}
-                  onClick={() => setOpenPlayIndex(i)}
-                  className={`text-[10px] font-black uppercase tracking-wide px-3 py-1.5 rounded-t-lg transition-all ${
-                    i === openPlayIndex ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/80'
-                  }`}>
-                  {s.court_name}
-                  {s.status === 'active' && <span className="ml-1.5 w-1.5 h-1.5 rounded-full bg-red-400 inline-block animate-pulse" />}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="max-w-7xl mx-auto px-5 py-2.5 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="shrink-0 flex items-center gap-1.5 font-black text-[10px] uppercase tracking-widest bg-white/20 px-2 py-0.5 rounded">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#00ff88] animate-pulse" />
-                {openPlaySession.status === 'active' ? 'Live Now' : openPlaySession.date === new Date().toISOString().split('T')[0] ? 'Today' : openPlaySession.date}
-              </span>
-              <span className="text-sm font-semibold truncate">
-                🏓 Open Play — {openPlaySession.court_name} · {openPlaySession.start_time.slice(0,5)}–{openPlaySession.end_time.slice(0,5)}
-                <span className="ml-2 opacity-75 capitalize text-xs">
-                  {openPlaySession.skill_filter === 'all' ? 'All levels' : openPlaySession.skill_filter}
-                </span>
-              </span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {openPlaySession.status === 'active' ? (
-                <a href="/open-play/live"
-                  className="bg-white text-[#00694c] text-xs font-black px-3 py-1.5 rounded-lg hover:bg-green-50 transition-colors flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  Watch Live →
-                </a>
-              ) : (
-                <button
-                  onClick={() => {
-                    if (!currentUser) {
-                      sessionStorage.setItem('open_play_return', `/open-play/register?session=${openPlaySession.id}`);
-                      onOpenLogin();
-                    } else {
-                      window.location.href = `/open-play/register?session=${openPlaySession.id}`;
-                    }
-                  }}
-                  className="bg-white text-[#00694c] text-xs font-black px-3 py-1.5 rounded-lg hover:bg-green-50 transition-colors">
-                  {currentUser ? 'Register →' : 'Login to Register →'}
-                </button>
-              )}
-              <button onClick={() => setOpenPlayDismissed(true)} className="opacity-60 hover:opacity-100 transition-opacity">
-                <XIcon className="w-3.5 h-3.5" />
-              </button>
-            </div>
+          <div className="max-w-7xl mx-auto px-5 py-0 divide-y divide-white/10">
+            {openPlaySessions.map((s) => (
+              <div key={s.id} className="flex items-center justify-between gap-3 py-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {s.status === 'active' ? (
+                    <span className="shrink-0 flex items-center gap-1 font-black text-[9px] uppercase tracking-widest bg-red-500/30 border border-red-400/40 px-2 py-0.5 rounded">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />Live
+                    </span>
+                  ) : (
+                    <span className="shrink-0 flex items-center gap-1 font-black text-[9px] uppercase tracking-widest bg-white/15 px-2 py-0.5 rounded">
+                      📅 {s.date}
+                    </span>
+                  )}
+                  <span className="text-sm font-semibold truncate">
+                    🏓 {s.court_name} · {s.start_time.slice(0,5)}–{s.end_time.slice(0,5)}
+                    <span className="ml-2 opacity-60 text-xs capitalize">{s.skill_filter === 'all' ? 'All levels' : s.skill_filter}</span>
+                  </span>
+                </div>
+                <div className="shrink-0">
+                  {s.status === 'active' ? (
+                    <a href="/open-play/live"
+                      className="bg-white text-[#00694c] text-xs font-black px-3 py-1.5 rounded-lg hover:bg-green-50 transition-colors flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />Watch Live →
+                    </a>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        if (!currentUser) {
+                          sessionStorage.setItem('open_play_return', `/open-play/register?session=${s.id}`);
+                          onOpenLogin();
+                        } else {
+                          window.location.href = `/open-play/register?session=${s.id}`;
+                        }
+                      }}
+                      className="bg-white text-[#00694c] text-xs font-black px-3 py-1.5 rounded-lg hover:bg-green-50 transition-colors">
+                      {currentUser ? 'Register →' : 'Login to Register →'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
+          <button onClick={() => setOpenPlayDismissed(true)}
+            className="absolute top-2 right-3 opacity-50 hover:opacity-100 transition-opacity">
+            <XIcon className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
