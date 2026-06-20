@@ -594,6 +594,136 @@ function CreateSessionModal({ courts, onClose, onCreated }: {
   );
 }
 
+// ─── Edit Session Modal ───────────────────────────────────────────────────────
+// Upcoming sessions: all fields editable.
+// Active sessions: only max_score, player_cap, skill_balance_mode editable.
+
+function EditSessionModal({ session, onClose, onSaved }: {
+  session: OPSession;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const isActive = session.status === 'active';
+
+  const [date, setDate]               = useState(session.date);
+  const [startTime, setStartTime]     = useState(session.start_time.slice(0, 5));
+  const [endTime, setEndTime]         = useState(session.end_time.slice(0, 5));
+  const [skillFilter, setSkillFilter] = useState<OPSession['skill_filter']>(session.skill_filter);
+  const [maxScore, setMaxScore]       = useState(session.max_score);
+  const [playerCap, setPlayerCap]     = useState<number | ''>(session.player_cap ?? '');
+  const [skillBalanceMode, setSkillBalanceMode] = useState<OPSession['skill_balance_mode']>(session.skill_balance_mode);
+  const [saving, setSaving]           = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isSupabaseEnabled || !supabase) return;
+    setSaving(true);
+
+    // Active sessions: only allow safe mid-game field changes
+    const patch = isActive
+      ? { max_score: maxScore, player_cap: playerCap === '' ? null : Number(playerCap), skill_balance_mode: skillBalanceMode }
+      : { date, start_time: startTime, end_time: endTime, skill_filter: skillFilter, max_score: maxScore, player_cap: playerCap === '' ? null : Number(playerCap), skill_balance_mode: skillBalanceMode };
+
+    await supabase.from('open_play_sessions').update(patch).eq('id', session.id);
+    setSaving(false);
+    onSaved();
+    onClose();
+  };
+
+  const inputCls = 'w-full border border-outline-variant rounded-lg p-2 text-sm focus:border-primary focus:ring-0';
+  const disabledInputCls = `${inputCls} bg-surface-container-low text-outline cursor-not-allowed opacity-60`;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-outline-variant">
+          <div>
+            <h3 className="font-black text-on-surface">Edit Session</h3>
+            {isActive && <p className="text-[10px] text-amber-600 font-bold mt-0.5">Session is live — some fields locked</p>}
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg text-outline hover:bg-surface-container-low"><X className="w-4 h-4" /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 text-sm">
+          {/* Date / Times — locked when active */}
+          <div>
+            <label className="block text-xs font-bold text-outline uppercase tracking-wider mb-1">Date</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} disabled={isActive}
+              className={isActive ? disabledInputCls : inputCls} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-outline uppercase tracking-wider mb-1">Start</label>
+              <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} disabled={isActive}
+                className={isActive ? disabledInputCls : inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-outline uppercase tracking-wider mb-1">End</label>
+              <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} disabled={isActive}
+                className={isActive ? disabledInputCls : inputCls} />
+            </div>
+          </div>
+          {/* Skill Filter — locked when active */}
+          <div>
+            <label className="block text-xs font-bold text-outline uppercase tracking-wider mb-1">Skill Filter</label>
+            <div className="grid grid-cols-4 gap-1.5">
+              {(['all', 'beginner', 'intermediate', 'pro'] as const).map(f => (
+                <button key={f} type="button" onClick={() => !isActive && setSkillFilter(f)} disabled={isActive}
+                  className={`py-2 rounded-lg text-xs font-bold border capitalize transition-all ${
+                    skillFilter === f ? 'bg-primary text-white border-primary' : 'border-outline-variant text-on-surface-variant'
+                  } ${isActive ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary'}`}>
+                  {f === 'intermediate' ? 'Mid' : f}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Max Score + Cap — always editable */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-outline uppercase tracking-wider mb-1">Max Score</label>
+              <input type="number" min={7} max={21} value={maxScore} onChange={e => setMaxScore(Number(e.target.value))}
+                className={`${inputCls} font-bold`} />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-outline uppercase tracking-wider mb-1">Player Cap</label>
+              <input type="number" min={4} value={playerCap} onChange={e => setPlayerCap(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="No limit" className={inputCls} />
+            </div>
+          </div>
+          {/* Matching Mode — always editable */}
+          <div>
+            <label className="block text-xs font-bold text-outline uppercase tracking-wider mb-1">Matching Mode</label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {([
+                { value: 'arrival_order', label: 'Arrival Order', desc: 'First-come, first-matched' },
+                { value: 'skill_aware',  label: 'Skill Aware',   desc: 'Balance by skill tier' },
+              ] as const).map(m => (
+                <button key={m.value} type="button" onClick={() => setSkillBalanceMode(m.value)}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all text-left ${
+                    skillBalanceMode === m.value ? 'bg-primary text-white border-primary' : 'border-outline-variant text-on-surface-variant hover:border-primary'
+                  }`}>
+                  <div>{m.label}</div>
+                  <div className={`text-[10px] font-normal mt-0.5 ${skillBalanceMode === m.value ? 'text-white/70' : 'text-outline'}`}>{m.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose}
+              className="flex-1 py-2.5 font-bold text-xs text-on-surface-variant border border-outline-variant rounded-xl">
+              Cancel
+            </button>
+            <button type="submit" disabled={saving}
+              className="flex-1 py-2.5 font-black text-xs bg-primary text-white rounded-xl disabled:opacity-60">
+              {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Add Player Modal ─────────────────────────────────────────────────────────
 
 function AddPlayerModal({ sessionId, onClose, onAdded }: {
@@ -682,6 +812,7 @@ export default function OpenPlayView() {
   const [activeGame, setActiveGame] = useState<OPGame | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showAddPlayer, setShowAddPlayer] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const selectedSession = sessions.find(s => s.id === selectedSessionId);
@@ -983,18 +1114,25 @@ export default function OpenPlayView() {
                     )}
                   </div>
 
-                  {selectedSession.status === 'upcoming' && (
-                    <button onClick={handleStartSession}
-                      className="w-full mt-3 py-2.5 bg-primary text-white text-xs font-black rounded-xl flex items-center justify-center gap-2">
-                      <Play className="w-3.5 h-3.5" /> Start Session
+                  <div className="mt-3 flex gap-2">
+                    {selectedSession.status === 'upcoming' && (
+                      <button onClick={handleStartSession}
+                        className="flex-1 py-2.5 bg-primary text-white text-xs font-black rounded-xl flex items-center justify-center gap-2">
+                        <Play className="w-3.5 h-3.5" /> Start Session
+                      </button>
+                    )}
+                    {selectedSession.status === 'active' && (
+                      <button onClick={handleEndSession}
+                        className="flex-1 py-2.5 bg-red-50 text-red-600 border border-red-200 text-xs font-black rounded-xl">
+                        End Session
+                      </button>
+                    )}
+                    {/* Fix K: edit session button — available for upcoming + active */}
+                    <button onClick={() => setShowEdit(true)}
+                      className="px-3 py-2.5 border border-outline-variant text-outline text-xs font-bold rounded-xl hover:border-primary hover:text-primary transition-colors">
+                      Edit
                     </button>
-                  )}
-                  {selectedSession.status === 'active' && (
-                    <button onClick={handleEndSession}
-                      className="w-full mt-3 py-2.5 bg-red-50 text-red-600 border border-red-200 text-xs font-black rounded-xl">
-                      End Session
-                    </button>
-                  )}
+                  </div>
                 </div>
 
                 {/* Waiting Pool */}
@@ -1127,6 +1265,9 @@ export default function OpenPlayView() {
       )}
       {showAddPlayer && selectedSessionId && (
         <AddPlayerModal sessionId={selectedSessionId} onClose={() => setShowAddPlayer(false)} onAdded={loadRegistrations} />
+      )}
+      {showEdit && selectedSession && (
+        <EditSessionModal session={selectedSession} onClose={() => setShowEdit(false)} onSaved={loadSessions} />
       )}
     </div>
   );
