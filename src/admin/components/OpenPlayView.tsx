@@ -65,6 +65,8 @@ interface OPTeam {
   session_id: string;
   player1_name: string;
   player2_name: string;
+  player1_tier?: string | null;
+  player2_tier?: string | null;
   email: string | null;
   wins: number;
   losses: number;
@@ -1256,15 +1258,17 @@ export default function OpenPlayView() {
       // 3. Insert teams
       const { data: insertedTeams } = await supabase
         .from('open_play_teams')
-        .insert(formed.map((t, i) => ({
+        .insert(formed.map((t) => ({
           session_id: selectedSessionId,
           player1_name: t.player1.player_name,
           player2_name: t.player2.player_name,
+          player1_tier: t.player1.skill_tier,
+          player2_tier: t.player2.skill_tier,
           email: null,
           reg1_id: t.player1.id,
           reg2_id: t.player2.id,
         })))
-        .select('id, player1_name, player2_name');
+        .select('id, player1_name, player2_name, player1_tier, player2_tier');
 
       // 4. Mark alternate registration (if odd count) so it's visible in admin
       if (alternate) {
@@ -1683,7 +1687,9 @@ export default function OpenPlayView() {
                             <div>
                               <div className="flex items-center gap-1.5">
                                 <span className="text-[10px] font-black text-outline">#{i + 1}</span>
-                                <span className="text-sm font-semibold text-on-surface">{t.player1_name} & {t.player2_name}</span>
+                                <span className="text-sm font-semibold text-on-surface">
+                                  {t.player1_name}{t.player1_tier ? ` (${t.player1_tier.charAt(0).toUpperCase() + t.player1_tier.slice(0,3)})` : ''} &amp; {t.player2_name}{t.player2_tier ? ` (${t.player2_tier.charAt(0).toUpperCase() + t.player2_tier.slice(0,3)})` : ''}
+                                </span>
                               </div>
                               <span className="text-[10px] text-outline ml-4">{t.wins}W–{t.losses}L</span>
                             </div>

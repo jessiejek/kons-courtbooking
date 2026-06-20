@@ -95,8 +95,7 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
   const handleSubmit = async () => {
     if (!session || !supabase) return;
     const isRR = session.session_type === 'round_robin';
-    // RR sessions may not require a skill tier — default to beginner if not set
-    if (!isRR && !tier) { setError('Please select your skill level.'); return; }
+    if (!tier) { setError('Please select your skill level.'); return; }
     const name = currentUser?.name ?? walkinName.trim();
     if (!name) { setError('Please enter your name.'); return; }
     setSubmitting(true);
@@ -291,13 +290,14 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
             </div>
           )}
 
-          {/* Skill tier — shown for rotation always; for RR only if session has a skill filter */}
-          {(!isRR || session.skill_filter !== 'all') && (
-            <>
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#6b7280] mb-3">Select your skill level</p>
-              <div className="space-y-3 mb-6">
-                {TIER_INFO.map(t => {
-                  const disabled = session.skill_filter !== 'all' && t.value !== session.skill_filter;
+          {/* Skill tier — always shown for both rotation and round-robin */}
+          <>
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#6b7280] mb-3">Select your skill level</p>
+            <div className="space-y-3 mb-6">
+              {TIER_INFO.map(t => {
+                  // For rotation: disable tiers that don't match the session filter.
+                  // For RR: all tiers always enabled (any player can join any RR session).
+                  const disabled = !isRR && session.skill_filter !== 'all' && t.value !== session.skill_filter;
                   return (
                     <button
                       key={t.value}
@@ -319,8 +319,7 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
                   );
                 })}
               </div>
-            </>
-          )}
+          </>
 
           {/* Wait time advisory — rotation only */}
           {!isRR && waitingCount >= PLAYERS_PER_MATCH && (() => {
@@ -347,7 +346,7 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
 
           <button
             onClick={handleSubmit}
-            disabled={(!isRR && !tier) || submitting}
+            disabled={!tier || submitting}
             className="w-full bg-[#00694c] hover:bg-[#005a40] disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm uppercase tracking-wider py-4 rounded-xl transition-colors">
             {submitting ? 'Registering…' : 'Register Now →'}
           </button>
