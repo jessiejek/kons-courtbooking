@@ -287,6 +287,7 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
                 <button
                   onClick={() => {
                     if (!currentUser) {
+                      sessionStorage.setItem('open_play_return', `/open-play/register?session=${openPlaySession.id}`);
                       onOpenLogin();
                     } else {
                       window.location.href = `/open-play/register?session=${openPlaySession.id}`;

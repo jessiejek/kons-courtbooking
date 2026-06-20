@@ -10,6 +10,7 @@ import BookingsHistory from './components/BookingsHistory';
 import BookingDetailPage from './components/BookingDetailPage';
 import TechnologyModal from './components/TechnologyModal';
 import OpenPlayLive from './components/OpenPlayLive';
+import OpenPlayRegister from './components/OpenPlayRegister';
 import LoginModal from '../LoginModal';
 import { CurrentUser } from '../App';
 import { supabase, isSupabaseEnabled } from '../lib/supabase';
@@ -147,6 +148,12 @@ export default function CustomerApp({ role, onLogin, onLogout, currentUser }: Pr
         } />
 
         <Route path="/open-play/live" element={<OpenPlayLive />} />
+        <Route path="/open-play/register" element={
+          <OpenPlayRegister
+            currentUser={currentUser}
+            onOpenLogin={() => setLoginModalOpen(true)}
+          />
+        } />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -159,6 +166,14 @@ export default function CustomerApp({ role, onLogin, onLogout, currentUser }: Pr
         onLogin={(r) => {
           onLogin(r);
           if (r === 'admin') navigate('/admin');
+          else {
+            // If user was trying to register for open play, redirect back
+            const pending = window.location.pathname + window.location.search;
+            if (!pending.startsWith('/open-play/register')) {
+              const returnTo = sessionStorage.getItem('open_play_return');
+              if (returnTo) { sessionStorage.removeItem('open_play_return'); navigate(returnTo); }
+            }
+          }
         }}
       />
     </div>
