@@ -54,14 +54,17 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
 
   useEffect(() => {
     if (!isSupabaseEnabled || !supabase) return;
+    // Prefer active sessions; fall back to upcoming
     supabase
       .from('open_play_sessions')
       .select('id, court_id, date, start_time, end_time, skill_filter, status')
       .in('status', ['upcoming', 'active'])
+      .order('status', { ascending: false }) // 'upcoming' < 'active' alphabetically → active first
       .order('date', { ascending: true })
       .limit(1)
       .maybeSingle()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) { console.error('[OpenPlay banner]', error); return; }
         if (!data) return;
         supabase!.from('courts').select('name').eq('id', data.court_id).single()
           .then(({ data: court }) => {
@@ -264,7 +267,7 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
             <div className="flex items-center gap-3 min-w-0">
               <span className="shrink-0 flex items-center gap-1.5 font-black text-[10px] uppercase tracking-widest bg-white/20 px-2 py-0.5 rounded">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#00ff88] animate-pulse" />
-                {openPlaySession.status === 'active' ? 'Live Now' : 'Today'}
+                {openPlaySession.status === 'active' ? 'Live Now' : openPlaySession.date === new Date().toISOString().split('T')[0] ? 'Today' : openPlaySession.date}
               </span>
               <span className="text-sm font-semibold truncate">
                 🏓 Open Play — {openPlaySession.court_name} · {openPlaySession.start_time.slice(0,5)}–{openPlaySession.end_time.slice(0,5)}
@@ -274,15 +277,25 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
               </span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <a href="/open-play/live" target="_blank"
-                className="text-[11px] font-bold underline underline-offset-2 opacity-80 hover:opacity-100 hidden sm:block">
-                Live View
-              </a>
-              <button
-                onClick={() => window.location.href = `/open-play/register?session=${openPlaySession.id}`}
-                className="bg-white text-[#00694c] text-xs font-black px-3 py-1.5 rounded-lg hover:bg-green-50 transition-colors">
-                Register →
-              </button>
+              {openPlaySession.status === 'active' ? (
+                <a href="/open-play/live"
+                  className="bg-white text-[#00694c] text-xs font-black px-3 py-1.5 rounded-lg hover:bg-green-50 transition-colors flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  Watch Live →
+                </a>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (!currentUser) {
+                      onOpenLogin();
+                    } else {
+                      window.location.href = `/open-play/register?session=${openPlaySession.id}`;
+                    }
+                  }}
+                  className="bg-white text-[#00694c] text-xs font-black px-3 py-1.5 rounded-lg hover:bg-green-50 transition-colors">
+                  {currentUser ? 'Register →' : 'Login to Register →'}
+                </button>
+              )}
               <button onClick={() => setOpenPlayDismissed(true)} className="opacity-60 hover:opacity-100 transition-opacity">
                 <XIcon className="w-3.5 h-3.5" />
               </button>
@@ -332,17 +345,28 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
                 <div className="flex items-center gap-2 mb-1">
                   <span className="w-2 h-2 rounded-full bg-[#00ff88] animate-pulse" />
                   <span className="text-[10px] font-black uppercase tracking-widest text-[#00ff88]">
-                    {openPlaySession.status === 'active' ? 'Open Play Live Now' : 'Open Play Today'}
+                    {openPlaySession.status === 'active' ? '🔴 Live Now — Open Play' : `Open Play · ${openPlaySession.date}`}
                   </span>
                 </div>
                 <p className="text-white font-bold text-sm">{openPlaySession.court_name} · {openPlaySession.start_time.slice(0,5)}–{openPlaySession.end_time.slice(0,5)}</p>
                 <p className="text-white/60 text-xs capitalize mt-0.5">{openPlaySession.skill_filter === 'all' ? 'All skill levels welcome' : `${openPlaySession.skill_filter} players only`}</p>
               </div>
-              <button
-                onClick={() => window.location.href = `/open-play/register?session=${openPlaySession.id}`}
-                className="shrink-0 bg-[#00ff88] text-[#003d2a] text-xs font-black px-5 py-2.5 rounded-xl hover:bg-[#00e87c] transition-colors">
-                Register Now →
-              </button>
+              {openPlaySession.status === 'active' ? (
+                <a href="/open-play/live"
+                  className="shrink-0 bg-[#00ff88] text-[#003d2a] text-xs font-black px-5 py-2.5 rounded-xl hover:bg-[#00e87c] transition-colors flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
+                  Watch Live →
+                </a>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (!currentUser) { onOpenLogin(); }
+                    else { window.location.href = `/open-play/register?session=${openPlaySession.id}`; }
+                  }}
+                  className="shrink-0 bg-[#00ff88] text-[#003d2a] text-xs font-black px-5 py-2.5 rounded-xl hover:bg-[#00e87c] transition-colors">
+                  {currentUser ? 'Register Now →' : 'Login to Register →'}
+                </button>
+              )}
             </div>
           )}
 
