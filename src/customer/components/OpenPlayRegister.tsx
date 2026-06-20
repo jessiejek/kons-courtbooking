@@ -42,6 +42,7 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [playerCount, setPlayerCount] = useState(0);
+  const [waitingCount, setWaitingCount] = useState(0);
 
   useEffect(() => {
     if (!sessionId || !isSupabaseEnabled || !supabase) { setLoadingSession(false); return; }
@@ -49,7 +50,7 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
     Promise.all([
       supabase.from('open_play_sessions').select('*').eq('id', sessionId).single(),
       supabase.from('courts').select('id, name'),
-      supabase.from('open_play_registrations').select('id, player_email').eq('session_id', sessionId).neq('status', 'done'),
+      supabase.from('open_play_registrations').select('id, player_email, status').eq('session_id', sessionId).neq('status', 'done'),
     ]).then(([{ data: s }, { data: courts }, { data: regs }]) => {
       if (s) {
         setSession({
@@ -57,6 +58,7 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
           court_name: courts?.find((c: any) => c.id === s.court_id)?.name ?? `Court ${s.court_id}`,
         });
         setPlayerCount(regs?.length ?? 0);
+        setWaitingCount(regs?.filter((r: any) => r.status === 'waiting').length ?? 0);
         if (currentUser?.email && regs?.some((r: any) => r.player_email === currentUser.email)) {
           setAlreadyRegistered(true);
         }
@@ -72,6 +74,25 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
     setSubmitting(true);
     setError(null);
 
+    // Guest dedup: check if a walk-in with this name already exists in the session
+    if (!currentUser) {
+      const { data: existing } = await supabase
+        .from('open_play_registrations')
+        .select('id')
+        .eq('session_id', session.id)
+        .eq('is_walkin', true)
+        .neq('status', 'done')
+        .ilike('player_name', name)
+        .maybeSingle();
+      if (existing) {
+        setError(`"${name}" is already registered for this session.`);
+        setSubmitting(false);
+        return;
+      }
+    }
+
+    // Fix C: set entered_pool_at explicitly so queue ordering never silently
+    // depends on whether the DB column has a DEFAULT configured.
     const { error: err } = await supabase.from('open_play_registrations').insert({
       session_id: session.id,
       player_name: name,
@@ -79,10 +100,15 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
       skill_tier: tier,
       is_walkin: !currentUser,
       status: 'waiting',
+      entered_pool_at: new Date().toISOString(),
     });
 
     if (err) {
-      setError(err.message);
+      // Handle DB-level unique constraint violation gracefully
+      const msg = err.code === '23505'
+        ? `"${name}" is already registered for this session.`
+        : err.message;
+      setError(msg);
       setSubmitting(false);
     } else {
       setDone(true);
@@ -242,6 +268,25 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
               );
             })}
           </div>
+
+          {/* Wait time advisory */}
+          {waitingCount >= 4 && (() => {
+            const gamesAhead = Math.floor(waitingCount / 4);
+            const minsLow = gamesAhead * 12;
+            const minsHigh = gamesAhead * 18;
+            return (
+              <div className="bg-amber-900/20 border border-amber-500/30 rounded-xl px-4 py-3 mb-4 flex items-start gap-3">
+                <span className="text-amber-400 text-lg leading-none mt-0.5">⏱</span>
+                <div>
+                  <p className="text-amber-300 text-xs font-black uppercase tracking-wider mb-0.5">Estimated wait</p>
+                  <p className="text-amber-200 text-sm">
+                    <span className="font-bold">{waitingCount} players</span> ahead of you —
+                    roughly <span className="font-bold">{minsLow}–{minsHigh} min</span> before your first game.
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
 
           {error && (
             <div className="bg-red-900/20 border border-red-500/30 rounded-xl px-4 py-3 mb-4 text-red-400 text-sm">{error}</div>
