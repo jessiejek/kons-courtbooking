@@ -295,9 +295,8 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
             <p className="text-[10px] font-black uppercase tracking-widest text-[#6b7280] mb-3">Select your skill level</p>
             <div className="space-y-3 mb-6">
               {TIER_INFO.map(t => {
-                  // For rotation: disable tiers that don't match the session filter.
-                  // For RR: all tiers always enabled (any player can join any RR session).
-                  const disabled = !isRR && session.skill_filter !== 'all' && t.value !== session.skill_filter;
+                  // Disable tiers that don't match the session skill filter (applies to both rotation and RR).
+                  const disabled = session.skill_filter !== 'all' && t.value !== session.skill_filter;
                   return (
                     <button
                       key={t.value}

@@ -444,7 +444,7 @@ function CreateSessionModal({ courts, onClose, onCreated }: {
       start_time: startTime,
       end_time: endTime,
       session_type: sessionType,
-      skill_filter: sessionType === 'round_robin' ? 'all' : skillFilter,
+      skill_filter: skillFilter,
       max_score: maxScore,
       player_cap: playerCap === '' ? null : Number(playerCap),
       is_recurring: isRecurring,
@@ -513,40 +513,40 @@ function CreateSessionModal({ courts, onClose, onCreated }: {
             </div>
           </div>
 
-          {/* Rotation-only fields */}
+          {/* Skill Filter — shown for both formats */}
+          <div>
+            <label className="block text-xs font-bold text-outline uppercase tracking-wider mb-1">Skill Filter</label>
+            <div className="grid grid-cols-4 gap-1.5">
+              {(['all', 'beginner', 'intermediate', 'pro'] as const).map(f => (
+                <button key={f} type="button" onClick={() => setSkillFilter(f)}
+                  className={`py-2 rounded-lg text-xs font-bold border capitalize transition-all ${
+                    skillFilter === f ? 'bg-primary text-white border-primary' : 'border-outline-variant text-on-surface-variant hover:border-primary'
+                  }`}>
+                  {f === 'intermediate' ? 'Mid' : f}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Matching Mode — rotation only (RR pairing is always random) */}
           {sessionType === 'rotation' && (
-            <>
-              <div>
-                <label className="block text-xs font-bold text-outline uppercase tracking-wider mb-1">Skill Filter</label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {(['all', 'beginner', 'intermediate', 'pro'] as const).map(f => (
-                    <button key={f} type="button" onClick={() => setSkillFilter(f)}
-                      className={`py-2 rounded-lg text-xs font-bold border capitalize transition-all ${
-                        skillFilter === f ? 'bg-primary text-white border-primary' : 'border-outline-variant text-on-surface-variant hover:border-primary'
-                      }`}>
-                      {f === 'intermediate' ? 'Mid' : f}
-                    </button>
-                  ))}
-                </div>
+            <div>
+              <label className="block text-xs font-bold text-outline uppercase tracking-wider mb-1">Matching Mode</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {([
+                  { value: 'arrival_order' as const, label: 'Arrival Order', desc: 'First-come, first-matched' },
+                  { value: 'skill_aware' as const, label: 'Skill Aware', desc: 'Balance by skill tier' },
+                ]).map(m => (
+                  <button key={m.value} type="button" onClick={() => setSkillBalanceMode(m.value)}
+                    className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all text-left ${
+                      skillBalanceMode === m.value ? 'bg-primary text-white border-primary' : 'border-outline-variant text-on-surface-variant hover:border-primary'
+                    }`}>
+                    <div>{m.label}</div>
+                    <div className={`text-[10px] font-normal mt-0.5 ${skillBalanceMode === m.value ? 'text-white/70' : 'text-outline'}`}>{m.desc}</div>
+                  </button>
+                ))}
               </div>
-              <div>
-                <label className="block text-xs font-bold text-outline uppercase tracking-wider mb-1">Matching Mode</label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {([
-                    { value: 'arrival_order' as const, label: 'Arrival Order', desc: 'First-come, first-matched' },
-                    { value: 'skill_aware' as const, label: 'Skill Aware', desc: 'Balance by skill tier' },
-                  ]).map(m => (
-                    <button key={m.value} type="button" onClick={() => setSkillBalanceMode(m.value)}
-                      className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all text-left ${
-                        skillBalanceMode === m.value ? 'bg-primary text-white border-primary' : 'border-outline-variant text-on-surface-variant hover:border-primary'
-                      }`}>
-                      <div>{m.label}</div>
-                      <div className={`text-[10px] font-normal mt-0.5 ${skillBalanceMode === m.value ? 'text-white/70' : 'text-outline'}`}>{m.desc}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
+            </div>
           )}
 
           {/* Max Score + Cap */}
