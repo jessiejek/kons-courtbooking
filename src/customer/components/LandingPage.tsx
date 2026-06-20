@@ -41,8 +41,10 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dismissedAnnouncements, setDismissedAnnouncements] = useState<Set<string>>(new Set());
   const [liveCourts, setLiveCourts] = useState<LiveCourt[]>([]);
-  const [openPlaySession, setOpenPlaySession] = useState<{ id: string; court_name: string; date: string; start_time: string; end_time: string; skill_filter: string; status: string } | null>(null);
+  const [openPlaySessions, setOpenPlaySessions] = useState<{ id: string; court_name: string; date: string; start_time: string; end_time: string; skill_filter: string; status: string }[]>([]);
+  const [openPlayIndex, setOpenPlayIndex] = useState(0);
   const [openPlayDismissed, setOpenPlayDismissed] = useState(false);
+  const openPlaySession = openPlaySessions[openPlayIndex] ?? null;
   const liveAnnouncements = useRealtimeAnnouncements();
   const visibleAnnouncements = liveAnnouncements.filter((a) => !dismissedAnnouncements.has(a.id));
 
@@ -54,23 +56,21 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
 
   useEffect(() => {
     if (!isSupabaseEnabled || !supabase) return;
-    // Prefer active sessions; fall back to upcoming
-    supabase
-      .from('open_play_sessions')
-      .select('id, court_id, date, start_time, end_time, skill_filter, status')
-      .in('status', ['upcoming', 'active'])
-      .order('status', { ascending: true }) // 'active' < 'upcoming' alphabetically → active first
-      .order('date', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error) { console.error('[OpenPlay banner]', error); return; }
-        if (!data) return;
-        supabase!.from('courts').select('name').eq('id', data.court_id).single()
-          .then(({ data: court }) => {
-            setOpenPlaySession({ ...data, court_name: court?.name ?? `Court ${data.court_id}` });
-          });
-      });
+    Promise.all([
+      supabase.from('open_play_sessions')
+        .select('id, court_id, date, start_time, end_time, skill_filter, status')
+        .in('status', ['upcoming', 'active'])
+        .order('status', { ascending: true }) // active first
+        .order('date', { ascending: true }),
+      supabase.from('courts').select('id, name'),
+    ]).then(([{ data, error }, { data: courts }]) => {
+      if (error) { console.error('[OpenPlay banner]', error); return; }
+      if (!data || data.length === 0) return;
+      setOpenPlaySessions(data.map((s: any) => ({
+        ...s,
+        court_name: courts?.find((c: any) => c.id === s.court_id)?.name ?? `Court ${s.court_id}`,
+      })));
+    });
   }, []);
 
   // Merge live data over static (for images + ratings which aren't in DB)
@@ -261,8 +261,24 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
       )}
 
       {/* ── OPEN PLAY BANNER ───────────────────────────────────── */}
-      {openPlaySession && !openPlayDismissed && (
+      {openPlaySessions.length > 0 && !openPlayDismissed && openPlaySession && (
         <div className="fixed top-[72px] left-0 right-0 z-39 bg-[#00694c] text-white">
+          {/* Court tabs — only show when multiple sessions */}
+          {openPlaySessions.length > 1 && (
+            <div className="flex border-b border-white/10 px-5 gap-1 pt-1">
+              {openPlaySessions.map((s, i) => (
+                <button
+                  key={s.id}
+                  onClick={() => setOpenPlayIndex(i)}
+                  className={`text-[10px] font-black uppercase tracking-wide px-3 py-1.5 rounded-t-lg transition-all ${
+                    i === openPlayIndex ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/80'
+                  }`}>
+                  {s.court_name}
+                  {s.status === 'active' && <span className="ml-1.5 w-1.5 h-1.5 rounded-full bg-red-400 inline-block animate-pulse" />}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="max-w-7xl mx-auto px-5 py-2.5 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <span className="shrink-0 flex items-center gap-1.5 font-black text-[10px] uppercase tracking-widest bg-white/20 px-2 py-0.5 rounded">
@@ -339,35 +355,42 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
             Sunshine Pickleball Courts — where every match feels like a championship.
           </p>
 
-          {/* Open Play hero card */}
-          {openPlaySession && (
-            <div className="mb-6 bg-white/10 border border-[#00ff88]/30 backdrop-blur-sm rounded-2xl px-6 py-4 flex flex-col sm:flex-row items-center gap-4 max-w-lg mx-auto">
-              <div className="text-left flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="w-2 h-2 rounded-full bg-[#00ff88] animate-pulse" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-[#00ff88]">
-                    {openPlaySession.status === 'active' ? '🔴 Live Now — Open Play' : `Open Play · ${openPlaySession.date}`}
-                  </span>
+          {/* Open Play hero cards — one per court */}
+          {openPlaySessions.length > 0 && (
+            <div className="mb-6 flex flex-col gap-3 max-w-lg mx-auto w-full">
+              {openPlaySessions.map(s => (
+                <div key={s.id} className="bg-white/10 border border-[#00ff88]/30 backdrop-blur-sm rounded-2xl px-5 py-3.5 flex items-center gap-4">
+                  <div className="text-left flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${s.status === 'active' ? 'bg-red-400' : 'bg-[#00ff88]'}`} />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-[#00ff88]">
+                        {s.status === 'active' ? 'Live Now' : s.date}
+                      </span>
+                    </div>
+                    <p className="text-white font-bold text-sm truncate">{s.court_name} · {s.start_time.slice(0,5)}–{s.end_time.slice(0,5)}</p>
+                    <p className="text-white/60 text-xs capitalize">{s.skill_filter === 'all' ? 'All levels' : `${s.skill_filter} only`}</p>
+                  </div>
+                  {s.status === 'active' ? (
+                    <a href="/open-play/live"
+                      className="shrink-0 bg-[#00ff88] text-[#003d2a] text-xs font-black px-4 py-2 rounded-xl hover:bg-[#00e87c] transition-colors flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />Watch Live
+                    </a>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        if (!currentUser) {
+                          sessionStorage.setItem('open_play_return', `/open-play/register?session=${s.id}`);
+                          onOpenLogin();
+                        } else {
+                          window.location.href = `/open-play/register?session=${s.id}`;
+                        }
+                      }}
+                      className="shrink-0 bg-[#00ff88] text-[#003d2a] text-xs font-black px-4 py-2 rounded-xl hover:bg-[#00e87c] transition-colors">
+                      {currentUser ? 'Register →' : 'Login →'}
+                    </button>
+                  )}
                 </div>
-                <p className="text-white font-bold text-sm">{openPlaySession.court_name} · {openPlaySession.start_time.slice(0,5)}–{openPlaySession.end_time.slice(0,5)}</p>
-                <p className="text-white/60 text-xs capitalize mt-0.5">{openPlaySession.skill_filter === 'all' ? 'All skill levels welcome' : `${openPlaySession.skill_filter} players only`}</p>
-              </div>
-              {openPlaySession.status === 'active' ? (
-                <a href="/open-play/live"
-                  className="shrink-0 bg-[#00ff88] text-[#003d2a] text-xs font-black px-5 py-2.5 rounded-xl hover:bg-[#00e87c] transition-colors flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
-                  Watch Live →
-                </a>
-              ) : (
-                <button
-                  onClick={() => {
-                    if (!currentUser) { onOpenLogin(); }
-                    else { window.location.href = `/open-play/register?session=${openPlaySession.id}`; }
-                  }}
-                  className="shrink-0 bg-[#00ff88] text-[#003d2a] text-xs font-black px-5 py-2.5 rounded-xl hover:bg-[#00e87c] transition-colors">
-                  {currentUser ? 'Register Now →' : 'Login to Register →'}
-                </button>
-              )}
+              ))}
             </div>
           )}
 
