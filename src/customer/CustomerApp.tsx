@@ -9,6 +9,7 @@ import ConfirmedPage from './components/ConfirmedPage';
 import BookingsHistory from './components/BookingsHistory';
 import BookingDetailPage from './components/BookingDetailPage';
 import TechnologyModal from './components/TechnologyModal';
+import OpenPlayLive from './components/OpenPlayLive';
 import LoginModal from '../LoginModal';
 import { CurrentUser } from '../App';
 import { supabase, isSupabaseEnabled } from '../lib/supabase';
@@ -144,6 +145,8 @@ export default function CustomerApp({ role, onLogin, onLogout, currentUser }: Pr
             onCancelBooking={() => {}}
           />
         } />
+
+        <Route path="/open-play/live" element={<OpenPlayLive />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
