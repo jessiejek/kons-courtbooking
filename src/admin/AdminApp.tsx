@@ -17,6 +17,7 @@ import ConfirmModal, { ConfirmOptions } from '../components/ConfirmModal';
 import WalkinView from './components/WalkinView';
 import PaymentsView from './components/PaymentsView';
 import UsersView from './components/UsersView';
+import OpenPlayView from './components/OpenPlayView';
 
 interface Props {
   role: 'user' | 'admin' | null;
@@ -423,6 +424,7 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
             } />
 
             <Route path="/users" element={<UsersView />} />
+            <Route path="/openplay" element={<OpenPlayView />} />
 
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Routes>
