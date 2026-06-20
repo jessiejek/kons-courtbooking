@@ -145,6 +145,23 @@ function ScoringPanel({ game, registrations, maxScore, onGameEnd, onUpdate, rrMo
 
   const getSide = (team: 'A' | 'B') => (team === 'A' ? sA : sB) % 2 === 0 ? 'Right' : 'Left';
 
+  // Compute who serves next (mirrors doSideOut logic, read-only)
+  const nextServer = (() => {
+    let nTeam = servingTeam;
+    let nIdx = serverIdx;
+    if (servingTeam === 'A') {
+      if (!firstServeDone && sA === 0 && sB === 0) { nTeam = 'B'; nIdx = 0; }
+      else if (serverIdx === 0 && !isDeuce(sA, sB)) { nIdx = 1; }
+      else { nTeam = 'B'; nIdx = 0; }
+    } else {
+      if (serverIdx === 0 && !isDeuce(sA, sB)) { nIdx = 1; }
+      else { nTeam = 'A'; nIdx = 0; }
+    }
+    if (rrMode) return `Team ${nTeam} serves`;
+    const regs = nTeam === 'A' ? teamARegs : teamBRegs;
+    return regs[nIdx]?.player_name ?? `Player ${nIdx + 1}`;
+  })();
+
   // Pickleball scoring rules (DO NOT MODIFY):
   // - First to 11 wins, must win by 2
   // - 10-10: keep playing, win by 2 (need 12)
@@ -396,7 +413,7 @@ function ScoringPanel({ game, registrations, maxScore, onGameEnd, onUpdate, rrMo
           <button onClick={doSideOut} disabled={isGameOver(sA, sB)}
             className="py-5 bg-gray-100 text-on-surface rounded-xl font-black text-base flex flex-col items-center gap-1 border border-outline-variant active:scale-95 transition-transform disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100">
             🔄 Side Out
-            <span className="text-[10px] font-semibold text-on-surface-variant">Serve changes</span>
+            <span className="text-[10px] font-semibold text-on-surface-variant">→ {nextServer} serves</span>
           </button>
         </div>
         <div className="flex gap-2">
