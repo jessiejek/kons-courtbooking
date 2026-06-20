@@ -79,43 +79,19 @@ function TierChip({ tier }: { tier: string }) {
 function makeMatch(pool: OPRegistration[]): [OPRegistration[], OPRegistration[]] | null {
   if (pool.length < 4) return null;
 
-  const sorted = [...pool].sort((a, b) =>
-    new Date(a.entered_pool_at).getTime() - new Date(b.entered_pool_at).getTime()
-  );
+  // Take the 4 who have waited longest
+  const next4 = [...pool]
+    .sort((a, b) => new Date(a.entered_pool_at).getTime() - new Date(b.entered_pool_at).getTime())
+    .slice(0, 4);
 
-  const tierOrder = { pro: 3, intermediate: 2, beginner: 1 };
-  const pros = sorted.filter(p => p.skill_tier === 'pro');
-  const mids = sorted.filter(p => p.skill_tier === 'intermediate');
-  const begs = sorted.filter(p => p.skill_tier === 'beginner');
+  // Snake draft by skill: sort desc [Pro, Pro, Mid, Beg]
+  // Pair [0]+[3] vs [1]+[2] → always most balanced possible
+  // e.g. Pro+Beg (4) vs Pro+Mid (5) — or Pro+Beg (4) vs Mid+Mid (4)
+  const tierVal = { pro: 3, intermediate: 2, beginner: 1 };
+  const ranked = [...next4].sort((a, b) => tierVal[b.skill_tier] - tierVal[a.skill_tier]);
 
-  let teamA: OPRegistration[] = [];
-  let teamB: OPRegistration[] = [];
-
-  // Smart balance: 1 strong + 1 weak vs 1 strong + 1 weak
-  if (pros.length >= 1 && mids.length >= 1 && begs.length >= 1) {
-    teamA = [pros[0], mids[0]];
-    teamB = [mids[1] ?? begs[0], begs[1] ?? begs[0]];
-    // dedupe
-    const used = new Set([teamA[0].id, teamA[1].id, teamB[0].id]);
-    const fallback = sorted.find(p => !used.has(p.id));
-    if (fallback) teamB[1] = fallback;
-  } else if (pros.length >= 2 && mids.length >= 2) {
-    teamA = [pros[0], mids[0]];
-    teamB = [pros[1], mids[1]];
-  } else if (pros.length >= 1 && mids.length >= 1) {
-    teamA = [pros[0], sorted.filter(p => !['pro'].includes(p.skill_tier))[0]];
-    teamB = [mids[0], sorted.find(p => p.id !== teamA[0].id && p.id !== teamA[1]?.id) ?? sorted[3]];
-  } else {
-    // Same tier — just take first 4 by wait time
-    teamA = [sorted[0], sorted[1]];
-    teamB = [sorted[2], sorted[3]];
-  }
-
-  // Fallback safety — ensure exactly 2 per team from sorted
-  if (teamA.length < 2 || teamB.length < 2 || new Set([...teamA, ...teamB].map(p => p.id)).size < 4) {
-    teamA = [sorted[0], sorted[1]];
-    teamB = [sorted[2], sorted[3]];
-  }
+  const teamA: OPRegistration[] = [ranked[0], ranked[3]]; // strongest + weakest
+  const teamB: OPRegistration[] = [ranked[1], ranked[2]]; // 2nd + 3rd
 
   return [teamA, teamB];
 }
