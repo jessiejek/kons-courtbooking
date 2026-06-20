@@ -110,7 +110,7 @@ export default function OpenPlayLive() {
   const loadData = useCallback(async () => {
     if (!selectedId || !isSupabaseEnabled || !supabase) return;
     const [{ data: regs }, { data: games }] = await Promise.all([
-      supabase.from('open_play_registrations').select('*').eq('session_id', selectedId).order('entered_pool_at'),
+      supabase.from('open_play_registrations').select('*').eq('session_id', selectedId).order('entered_pool_at').order('id', { ascending: true }), // Fix D
       supabase.from('open_play_games').select('*').eq('session_id', selectedId).in('status', ['rally', 'active']).order('started_at', { ascending: false }),
     ]);
     if (regs) setRegistrations(regs);

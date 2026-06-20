@@ -707,7 +707,8 @@ export default function OpenPlayView() {
       .from('open_play_registrations')
       .select('*')
       .eq('session_id', selectedSessionId)
-      .order('entered_pool_at', { ascending: true });
+      .order('entered_pool_at', { ascending: true })
+      .order('id', { ascending: true }); // Fix D: deterministic secondary sort for tied timestamps
     if (data) setRegistrations(data);
   }, [selectedSessionId]);
 
@@ -781,7 +782,8 @@ export default function OpenPlayView() {
       .select('*')
       .eq('session_id', selectedSessionId)
       .eq('status', 'waiting')
-      .order('entered_pool_at', { ascending: true });
+      .order('entered_pool_at', { ascending: true })
+      .order('id', { ascending: true }); // Fix D: deterministic secondary sort
 
     // Fix 2: surface awaiting_players state — auto-retry fires via Realtime when 4th player joins
     if (!pool || pool.length < 4) { await loadRegistrations(); return; }
