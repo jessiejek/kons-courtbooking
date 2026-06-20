@@ -791,12 +791,28 @@ export default function OpenPlayView() {
     if (!match) { await loadRegistrations(); return; }
 
     const [teamA, teamB] = match;
-    const { data: game } = await supabase.from('open_play_games').insert({
-      session_id: selectedSessionId,
-      team_a: teamA.map(p => p.id),
-      team_b: teamB.map(p => p.id),
-      status: 'rally',
-    }).select().single();
+
+    // Fix B: wrap insert in try/catch — the partial unique index
+    // (one_active_game_per_session) makes concurrent inserts fail atomically.
+    // A 23505 violation means a parallel call already won the race; treat it as
+    // "another match started" and bail out cleanly without surfacing an error.
+    let game: OPGame | null = null;
+    try {
+      const { data, error } = await supabase.from('open_play_games').insert({
+        session_id: selectedSessionId,
+        team_a: teamA.map(p => p.id),
+        team_b: teamB.map(p => p.id),
+        status: 'rally',
+      }).select().single();
+      if (error) {
+        if (error.code === '23505') { await loadRegistrations(); return; }
+        throw error;
+      }
+      game = data;
+    } catch (e: any) {
+      if (e?.code === '23505') { await loadRegistrations(); return; }
+      throw e;
+    }
 
     const ids = [...teamA, ...teamB].map(p => p.id);
     await supabase.from('open_play_registrations').update({ status: 'playing' }).in('id', ids);
