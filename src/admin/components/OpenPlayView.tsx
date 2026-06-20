@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, type FormEvent } from 'react';
+import { useToast, ToastContainer } from '../../components/Toast';
 import { Plus, X, Users, Play, Trophy, Clock, Shield, CheckCircle } from 'lucide-react';
 import { supabase, isSupabaseEnabled } from '../../lib/supabase';
 import {
@@ -1006,6 +1007,7 @@ function RRChampionModal({ teams, onClose }: {
 // ─── Main View ────────────────────────────────────────────────────────────────
 
 export default function OpenPlayView() {
+  const { toasts, toast, removeToast } = useToast();
   const [courts, setCourts] = useState<Court[]>([]);
   const [sessions, setSessions] = useState<OPSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -1252,7 +1254,7 @@ export default function OpenPlayView() {
 
       const registrants = (regs ?? []) as { id: string; player_name: string; skill_tier: string }[];
       if (registrants.length < 2) {
-        alert('Need at least 2 checked-in players to start a Round-Robin session. Mark players present first.');
+        toast('warning', 'Not enough players', 'Need at least 2 checked-in players to start. Mark players present first.');
         return;
       }
 
@@ -1294,7 +1296,7 @@ export default function OpenPlayView() {
       }));
 
       if (rrTeamList.length < 2) {
-        alert('Team insertion failed — check Supabase logs.');
+        toast('error', 'Team insertion failed', 'Check Supabase logs for details.');
         return;
       }
 
@@ -1455,6 +1457,7 @@ export default function OpenPlayView() {
 
   return (
     <div className="space-y-6">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
