@@ -143,7 +143,7 @@ interface ScoringPanelProps {
 }
 
 function ScoringPanel({ game, registrations, maxScore, onGameEnd, onUpdate }: ScoringPanelProps) {
-  const [screen, setScreen] = useState<'rally' | 'scoring' | 'over'>(
+  const [screen, setScreen] = useState<'rally' | 'scoring' | 'over' | 'champion'>(
     game.status === 'rally' ? 'rally' : game.status === 'active' ? 'scoring' : 'over'
   );
   const [sA, setSA] = useState(game.score_a);
@@ -255,6 +255,10 @@ function ScoringPanel({ game, registrations, maxScore, onGameEnd, onUpdate }: Sc
       status: 'ended', winner_team: winner,
       score_a: sA, score_b: sB, ended_at: new Date().toISOString(),
     }).eq('id', game.id);
+    // Check if winners already have 2 consecutive wins → this win makes 3 → champion!
+    const winnerRegs = winner === 'A' ? teamARegs : teamBRegs;
+    const isChampion = winnerRegs.every(r => r.consecutive_wins >= 2);
+    if (isChampion) { setScreen('champion'); return; }
     onGameEnd(winner, sA, sB);
   };
 
@@ -309,9 +313,38 @@ function ScoringPanel({ game, registrations, maxScore, onGameEnd, onUpdate }: Sc
     </div>
   );
 
+  if (screen === 'champion') {
+    const champRegs = sA > sB ? teamARegs : teamBRegs;
+    const loserRegs = sA > sB ? teamBRegs : teamARegs;
+    return (
+      <div className="bg-gradient-to-b from-amber-50 to-white border-2 border-amber-400 rounded-xl p-6 text-center">
+        <div className="text-4xl mb-2 animate-bounce">🏆</div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-1">3 Consecutive Wins!</p>
+        <p className="text-2xl font-black text-amber-600 mb-2">ROTATION CHAMPION</p>
+        <div className="bg-amber-100 rounded-xl p-3 mb-3">
+          {champRegs.map(r => (
+            <div key={r.id} className="flex items-center justify-center gap-2 mb-1">
+              <TierDot tier={r.skill_tier} />
+              <span className="font-black text-base text-amber-800">{r.player_name}</span>
+            </div>
+          ))}
+        </div>
+        <p className="text-3xl font-black text-on-surface mb-1">{sA} – {sB}</p>
+        <p className="text-xs text-on-surface-variant mb-4">
+          Streak resets · {loserRegs.map(r => r.player_name).join(' & ')} → back to pool
+        </p>
+        <button
+          onClick={() => onGameEnd(sA > sB ? 'A' : 'B', sA, sB)}
+          className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-black text-sm rounded-xl transition-colors">
+          🎉 Celebrate & Continue Session →
+        </button>
+      </div>
+    );
+  }
+
   if (screen === 'over') return (
     <div className="bg-white border-2 border-primary rounded-xl p-5 text-center">
-      <div className="text-2xl mb-1">🏆</div>
+      <div className="text-2xl mb-1">🏅</div>
       <p className="text-lg font-black text-primary mb-1">Game Over!</p>
       <p className="text-3xl font-black text-on-surface mb-2">{sA} – {sB}</p>
       <p className="text-sm font-bold text-on-surface mb-1">
@@ -670,6 +703,19 @@ export default function OpenPlayView() {
       loadActiveGame();
     }
   }, [selectedSessionId]);
+
+  // Realtime: auto-refresh when players register online or pool changes
+  useEffect(() => {
+    if (!selectedSessionId || !isSupabaseEnabled || !supabase) return;
+    const ch = supabase
+      .channel(`admin-op-${selectedSessionId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'open_play_registrations', filter: `session_id=eq.${selectedSessionId}` },
+        () => loadRegistrations())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'open_play_games', filter: `session_id=eq.${selectedSessionId}` },
+        () => loadActiveGame())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [selectedSessionId, loadRegistrations, loadActiveGame]);
 
   const handleStartSession = async () => {
     if (!selectedSessionId || !isSupabaseEnabled || !supabase) return;

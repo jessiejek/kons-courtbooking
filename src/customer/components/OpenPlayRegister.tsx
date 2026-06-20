@@ -36,6 +36,7 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
   const [session, setSession] = useState<OPSession | null>(null);
   const [loadingSession, setLoadingSession] = useState(true);
   const [tier, setTier] = useState<Tier | null>(null);
+  const [walkinName, setWalkinName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
@@ -65,16 +66,18 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
   }, [sessionId, currentUser]);
 
   const handleSubmit = async () => {
-    if (!tier || !session || !currentUser || !supabase) return;
+    if (!tier || !session || !supabase) return;
+    const name = currentUser?.name ?? walkinName.trim();
+    if (!name) { setError('Please enter your name.'); return; }
     setSubmitting(true);
     setError(null);
 
     const { error: err } = await supabase.from('open_play_registrations').insert({
       session_id: session.id,
-      player_name: currentUser.name,
-      player_email: currentUser.email,
+      player_name: name,
+      player_email: currentUser?.email ?? null,
       skill_tier: tier,
-      is_walkin: false,
+      is_walkin: !currentUser,
       status: 'waiting',
     });
 
@@ -86,24 +89,7 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
     }
   };
 
-  // ── Not logged in ───────────────────────────────────────────────────────────
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen bg-[#0a1a12] flex flex-col items-center justify-center gap-6 p-6">
-        <div className="text-5xl">🏓</div>
-        <h1 className="text-white font-black text-2xl text-center">Register for Open Play</h1>
-        <p className="text-[#6b7280] text-sm text-center max-w-xs">You need to be logged in to register for an Open Play session.</p>
-        <button
-          onClick={onOpenLogin}
-          className="bg-[#00694c] hover:bg-[#005a40] text-white font-black px-8 py-3.5 rounded-xl transition-colors">
-          Login to Register →
-        </button>
-        <button onClick={() => navigate('/')} className="text-[#4b5563] text-sm hover:text-white transition-colors">
-          ← Back to Home
-        </button>
-      </div>
-    );
-  }
+  // Guest users can still walk in — no login required
 
   if (loadingSession) {
     return (
@@ -159,7 +145,7 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
         <div className="w-20 h-20 rounded-full bg-[#00694c]/20 border-2 border-[#00694c] flex items-center justify-center text-4xl">🏓</div>
         <h1 className="text-white font-black text-3xl text-center">You're in!</h1>
         <p className="text-[#9ca3af] text-sm text-center max-w-sm">
-          <span className="text-white font-bold">{currentUser.name}</span> is registered for Open Play on{' '}
+          <span className="text-white font-bold">{currentUser?.name ?? walkinName}</span> is registered for Open Play on{' '}
           <span className="text-[#00ff88] font-bold">{session.court_name}</span> — {session.date} at {session.start_time.slice(0,5)}.
           Show up and you'll be added to the pool!
         </p>
@@ -214,7 +200,21 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
       ) : (
         <div className="w-full max-w-lg">
           <h1 className="text-2xl font-black text-white mb-1">Register for Open Play</h1>
-          <p className="text-[#6b7280] text-sm mb-6">Registering as <span className="text-white font-bold">{currentUser.name}</span></p>
+          {currentUser ? (
+            <p className="text-[#6b7280] text-sm mb-6">Registering as <span className="text-white font-bold">{currentUser.name}</span></p>
+          ) : (
+            <div className="mb-6">
+              <p className="text-[#6b7280] text-sm mb-3">Walk-in? Enter your name to register.</p>
+              <input
+                type="text"
+                value={walkinName}
+                onChange={e => setWalkinName(e.target.value)}
+                placeholder="Your name"
+                className="w-full bg-[#1f2d22] border border-[#374151] text-white placeholder-[#4b5563] rounded-xl px-4 py-3 text-sm focus:border-[#00694c] focus:outline-none mb-2"
+              />
+              <button onClick={onOpenLogin} className="text-[#00694c] text-xs hover:underline">Have an account? Login instead →</button>
+            </div>
+          )}
 
           {/* Skill tier */}
           <p className="text-[10px] font-black uppercase tracking-widest text-[#6b7280] mb-3">Select your skill level</p>
