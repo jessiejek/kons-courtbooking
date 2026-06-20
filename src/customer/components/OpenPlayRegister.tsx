@@ -67,6 +67,27 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
     });
   }, [sessionId, currentUser]);
 
+  // Fix H: keep wait advisory live via Realtime — re-fetch counts on any registration change
+  useEffect(() => {
+    if (!sessionId || !isSupabaseEnabled || !supabase) return;
+    const ch = supabase
+      .channel(`register-advisory-${sessionId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'open_play_registrations', filter: `session_id=eq.${sessionId}` },
+        async () => {
+          const { data } = await supabase!
+            .from('open_play_registrations')
+            .select('id, status')
+            .eq('session_id', sessionId)
+            .neq('status', 'done');
+          if (data) {
+            setPlayerCount(data.length);
+            setWaitingCount(data.filter((r: any) => r.status === 'waiting').length);
+          }
+        })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [sessionId]);
+
   const handleSubmit = async () => {
     if (!tier || !session || !supabase) return;
     const name = currentUser?.name ?? walkinName.trim();
