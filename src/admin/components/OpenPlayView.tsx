@@ -162,15 +162,16 @@ function ScoringPanel({ game, registrations, maxScore, onGameEnd, onUpdate }: Sc
 
   const getSide = (team: 'A' | 'B') => (team === 'A' ? sA : sB) % 2 === 0 ? 'Right' : 'Left';
 
-  // Standard pickleball: win at 11, win by 2
-  // At 10-10 (deuce): must win by 2, capped at maxScore (admin setting, default 15)
-  // e.g. 10-10 → need 12; 11-11 → need 13; ... until maxScore-maxScore → win by 2 no cap
-  const WIN_SCORE = 11;
-  const isDeuce = (a: number, b: number) => a >= (WIN_SCORE - 1) && b >= (WIN_SCORE - 1);
+  // Pickleball scoring rules:
+  // - First to 11 wins, must win by 2
+  // - 10-10: keep playing, win by 2 (need 12)
+  // - 11-11: keep playing, win by 2 (need 13)
+  // - Once someone reaches maxScore (admin cap e.g. 15): they win immediately
+  const isDeuce = (a: number, b: number) => a >= 10 && b >= 10;
   const isGameOver = (a: number, b: number) => {
-    if (!isDeuce(a, b)) return (a >= WIN_SCORE || b >= WIN_SCORE) && Math.abs(a - b) >= 2;
-    // In deuce: need 2-point lead, but if both reach maxScore it's sudden death (win by 2, no further cap)
-    return Math.abs(a - b) >= 2 && (Math.max(a, b) >= WIN_SCORE + 1);
+    if (a >= maxScore || b >= maxScore) return true;         // hit the cap → instant win
+    if (isDeuce(a, b)) return Math.abs(a - b) >= 2;         // deuce → need 2-point lead
+    return (a >= 11 || b >= 11) && Math.abs(a - b) >= 2;   // normal → first to 11, win by 2
   };
 
   const saveHistory = () =>
