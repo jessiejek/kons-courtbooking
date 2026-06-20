@@ -353,13 +353,13 @@ function ScoringPanel({ game, registrations, maxScore, onGameEnd, onUpdate }: Sc
       <div className="bg-white border border-outline-variant/40 rounded-xl p-4">
         <p className="text-[10px] font-black uppercase tracking-widest text-outline text-center mb-3">What just happened?</p>
         <div className="grid grid-cols-2 gap-3 mb-3">
-          <button onClick={doPoint}
-            className="py-5 bg-primary text-white rounded-xl font-black text-base flex flex-col items-center gap-1 active:scale-95 transition-transform">
+          <button onClick={doPoint} disabled={isGameOver(sA, sB)}
+            className="py-5 bg-primary text-white rounded-xl font-black text-base flex flex-col items-center gap-1 active:scale-95 transition-transform disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100">
             ✅ Point
             <span className="text-[10px] font-semibold opacity-80">Serving team scores</span>
           </button>
-          <button onClick={doSideOut}
-            className="py-5 bg-gray-100 text-on-surface rounded-xl font-black text-base flex flex-col items-center gap-1 border border-outline-variant active:scale-95 transition-transform">
+          <button onClick={doSideOut} disabled={isGameOver(sA, sB)}
+            className="py-5 bg-gray-100 text-on-surface rounded-xl font-black text-base flex flex-col items-center gap-1 border border-outline-variant active:scale-95 transition-transform disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100">
             🔄 Side Out
             <span className="text-[10px] font-semibold text-on-surface-variant">Serve changes</span>
           </button>
