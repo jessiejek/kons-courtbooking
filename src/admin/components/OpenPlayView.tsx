@@ -150,8 +150,7 @@ function ScoringPanel({ game, registrations, maxScore, onGameEnd, onUpdate, rrMo
     let nTeam = servingTeam;
     let nIdx = serverIdx;
     if (servingTeam === 'A') {
-      if (!firstServeDone && sA === 0 && sB === 0) { nTeam = 'B'; nIdx = 0; }
-      else if (serverIdx === 0 && !isDeuce(sA, sB)) { nIdx = 1; }
+      if (serverIdx === 0 && !isDeuce(sA, sB)) { nIdx = 1; }
       else { nTeam = 'B'; nIdx = 0; }
     } else {
       if (serverIdx === 0 && !isDeuce(sA, sB)) { nIdx = 1; }
@@ -208,9 +207,7 @@ function ScoringPanel({ game, registrations, maxScore, onGameEnd, onUpdate, rrMo
     let newFirstDone = firstServeDone;
 
     if (servingTeam === 'A') {
-      if (!firstServeDone && sA === 0 && sB === 0) {
-        newTeam = 'B'; newIdx = 0; newFirstDone = true;
-      } else if (serverIdx === 0 && !(isDeuce(sA, sB))) {
+      if (serverIdx === 0 && !(isDeuce(sA, sB))) {
         newIdx = 1;
       } else {
         newTeam = 'B'; newIdx = 0;
@@ -1815,6 +1812,17 @@ export default function OpenPlayView() {
                           {activeGame.rr_team_a_name} vs {activeGame.rr_team_b_name}
                         </span>
                       )}
+                      <button
+                        onClick={() => {
+                          const url = `${window.location.origin}/open-play/live?session=${selectedSession.id}`;
+                          navigator.clipboard.writeText(url).then(() => {
+                            const btn = document.getElementById('share-live-btn');
+                            if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = '⬡ Share Live Link'; }, 2000); }
+                          });
+                        }}
+                        id="share-live-btn"
+                        className="ml-auto text-[11px] font-semibold border border-outline-variant/50 rounded-lg px-3 py-1 hover:bg-surface-variant/40 transition-colors"
+                      >⬡ Share Live Link</button>
                     </div>
                     <ScoringPanel
                       game={activeGame}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase, isSupabaseEnabled } from '../../lib/supabase';
 import { makeMatch, sortStandings, ANNOUNCEMENT_MS, PLAYERS_PER_MATCH } from '../../lib/openPlayMatchmaking';
 import type { BalanceMode } from '../../lib/openPlayMatchmaking';
@@ -101,8 +102,10 @@ interface WinnerAnnouncement {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function OpenPlayLive() {
+  const [searchParams] = useSearchParams();
+  const preselectedSession = searchParams.get('session');
   const [sessions, setSessions] = useState<OPSession[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(preselectedSession);
   const [registrations, setRegistrations] = useState<OPRegistration[]>([]);
   const [activeGame, setActiveGame] = useState<OPGame | null>(null);
   const [rrTeams, setRRTeams] = useState<OPTeam[]>([]);
