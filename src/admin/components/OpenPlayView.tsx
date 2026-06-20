@@ -255,6 +255,10 @@ function ScoringPanel({ game, registrations, maxScore, onGameEnd, onUpdate }: Sc
       score_a: prev.sA, score_b: prev.sB,
       serving_team: prev.servingTeam, server_index: prev.serverIdx, first_serve_done: prev.firstServeDone,
     }).eq('id', game.id);
+    // Fix J: open_play_game_events is NOT updated on undo. The events table is a
+    // purely cosmetic append-only audit log — no stats, replay, or scoring logic
+    // reads it back. The live score is authoritative from open_play_games.score_a/b.
+    // If this log ever becomes load-bearing, append a compensating undo event here.
   };
 
   const confirmGameOver = async () => {
