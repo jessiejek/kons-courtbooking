@@ -162,12 +162,15 @@ function ScoringPanel({ game, registrations, maxScore, onGameEnd, onUpdate }: Sc
 
   const getSide = (team: 'A' | 'B') => (team === 'A' ? sA : sB) % 2 === 0 ? 'Right' : 'Left';
 
-  // Game ends when someone reaches maxScore AND leads by 2
-  // After deuce (both at maxScore-1), keep playing until 2-point lead — no cap
-  const isDeuce = (a: number, b: number) => a >= (maxScore - 1) && b >= (maxScore - 1);
+  // Standard pickleball: win at 11, win by 2
+  // At 10-10 (deuce): must win by 2, capped at maxScore (admin setting, default 15)
+  // e.g. 10-10 → need 12; 11-11 → need 13; ... until maxScore-maxScore → win by 2 no cap
+  const WIN_SCORE = 11;
+  const isDeuce = (a: number, b: number) => a >= (WIN_SCORE - 1) && b >= (WIN_SCORE - 1);
   const isGameOver = (a: number, b: number) => {
-    if (isDeuce(a, b)) return Math.abs(a - b) >= 2;
-    return (a >= maxScore || b >= maxScore) && Math.abs(a - b) >= 2;
+    if (!isDeuce(a, b)) return (a >= WIN_SCORE || b >= WIN_SCORE) && Math.abs(a - b) >= 2;
+    // In deuce: need 2-point lead, but if both reach maxScore it's sudden death (win by 2, no further cap)
+    return Math.abs(a - b) >= 2 && (Math.max(a, b) >= WIN_SCORE + 1);
   };
 
   const saveHistory = () =>
@@ -333,7 +336,7 @@ function ScoringPanel({ game, registrations, maxScore, onGameEnd, onUpdate }: Sc
             <div className={`text-4xl font-black leading-none ${sA > sB ? 'text-primary' : 'text-on-surface'}`}>{sA}</div>
             <div className="text-gray-300 text-xl">–</div>
             <div className={`text-4xl font-black leading-none ${sB > sA ? 'text-primary' : 'text-on-surface'}`}>{sB}</div>
-            <div className="text-[8px] text-outline mt-2 text-center font-bold">First to {maxScore}<br/>Win by 2</div>
+            <div className="text-[8px] text-outline mt-2 text-center font-bold">First to 11<br/>Win by 2{isDeuce(sA, sB) ? `\nCap: ${maxScore}` : ''}</div>
           </div>
           <div className="p-3"><TeamSide team="B" regs={teamBRegs} /></div>
         </div>
@@ -342,7 +345,7 @@ function ScoringPanel({ game, registrations, maxScore, onGameEnd, onUpdate }: Sc
       {/* Status */}
       <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 font-semibold text-center">
         🏓 {serverName} is serving · {getSide(servingTeam)} side
-        {isDeuce(sA, sB) && <span className="ml-2 font-black text-red-600">· DEUCE — 1 server each</span>}
+        {isDeuce(sA, sB) && <span className="ml-2 font-black text-red-600">· DEUCE {sA}-{sB} — 1 server each, win by 2</span>}
       </div>
 
       {/* Action buttons */}
