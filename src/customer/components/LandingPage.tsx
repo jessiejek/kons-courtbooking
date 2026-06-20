@@ -279,8 +279,10 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
                   <span className="text-sm font-semibold truncate">
                     <span className="shrink-0 font-black text-[9px] uppercase tracking-widest bg-white/20 px-2 py-0.5 rounded mr-2">Open Play</span>
                     🏓 {s.court_name} · {s.start_time.slice(0,5)}–{s.end_time.slice(0,5)}
-                    <span className="ml-2 opacity-60 text-xs capitalize">{s.session_type === 'round_robin' ? 'Round-Robin' : 'Rotation'}</span>
-                    {s.session_type === 'rotation' && s.skill_filter !== 'all' && <span className="ml-1 opacity-60 text-xs capitalize">· {s.skill_filter}</span>}
+                    <span className="ml-2 opacity-60 text-xs capitalize">
+                      {s.session_type === 'round_robin' ? 'Round-Robin' : 'Rotation'}
+                      {s.skill_filter && s.skill_filter !== 'all' ? ` · ${s.skill_filter}` : s.session_type === 'round_robin' ? ' · All' : ''}
+                    </span>
                   </span>
                 </div>
                 <div className="shrink-0">
@@ -363,7 +365,7 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
                     <p className="text-white font-bold text-sm truncate">{s.court_name} · {s.start_time.slice(0,5)}–{s.end_time.slice(0,5)}</p>
                     <p className="text-white/60 text-xs capitalize">
                       {s.session_type === 'round_robin' ? 'Round-Robin' : 'Rotation'}
-                      {s.session_type === 'rotation' && s.skill_filter !== 'all' && ` · ${s.skill_filter} only`}
+                      {s.skill_filter && s.skill_filter !== 'all' ? ` · ${s.skill_filter}` : s.session_type === 'round_robin' ? ' · All' : ''}
                     </p>
                   </div>
                   {s.status === 'active' ? (
