@@ -128,6 +128,60 @@ export function generateRoundRobinSchedule(teams: RRTeam[]): RRScheduleMatch[] {
   return matches;
 }
 
+// ─── RR Team Formation ───────────────────────────────────────────────────────
+
+export interface SoloRegistrant {
+  id: string;
+  player_name: string;
+  skill_tier: SkillTier;
+}
+
+export interface FormedTeam {
+  player1: SoloRegistrant;
+  player2: SoloRegistrant;
+}
+
+export interface FormationResult {
+  teams: FormedTeam[];
+  alternate: SoloRegistrant | null; // set when registrant count is odd
+}
+
+/**
+ * Pair solo registrants into teams for a round-robin session.
+ * Optionally uses closest-tier pairing when skillAware=true (default false = random).
+ * Odd count → last player becomes alternate (not silently dropped).
+ */
+export function pairRegistrationsIntoTeams(
+  registrants: SoloRegistrant[],
+  skillAware = false
+): FormationResult {
+  if (registrants.length === 0) return { teams: [], alternate: null };
+
+  const pool = [...registrants];
+  // Fisher-Yates shuffle for randomness
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+
+  let alternate: SoloRegistrant | null = null;
+  if (pool.length % 2 === 1) {
+    alternate = pool.pop()!;
+  }
+
+  if (skillAware) {
+    // Sort by tier so consecutive pairs are closest in skill
+    pool.sort((a, b) => TIER_VAL[b.skill_tier] - TIER_VAL[a.skill_tier]);
+  }
+
+  const teams: FormedTeam[] = [];
+  for (let i = 0; i < pool.length; i += 2) {
+    teams.push({ player1: pool[i], player2: pool[i + 1] });
+  }
+
+  return { teams, alternate };
+}
+
 /** Sort teams for standings: wins DESC → point differential DESC → points_for DESC. */
 export function sortStandings<T extends { wins: number; losses: number; points_for: number; points_against: number }>(
   teams: T[]

@@ -402,16 +402,17 @@ export default function BookingsHistory({
                   </div>
                 );
               })}
-              {/* Rotation registrations */}
+              {/* Open Play registrations (both rotation and RR pre-start) */}
               {openPlayRegs.map((reg) => {
                 const s = reg.session;
                 const isActive = s?.status === 'active';
                 const isEnded = s?.status === 'ended';
-                const statusLabel = reg.status === 'playing' ? 'On Court' : reg.status === 'done' ? 'Done' : 'Waiting';
-                const statusColor = reg.status === 'playing' ? 'bg-green-100 text-green-700' : reg.status === 'done' ? 'bg-slate-100 text-slate-500' : 'bg-amber-50 text-amber-700';
+                const isRRReg = s?.session_type === 'round_robin';
+                const statusLabel = reg.status === 'playing' ? 'On Court' : reg.status === 'done' ? 'Done' : isRRReg && !isActive ? 'Registered' : 'Waiting';
+                const statusColor = reg.status === 'playing' ? 'bg-green-100 text-green-700' : reg.status === 'done' ? 'bg-slate-100 text-slate-500' : isRRReg ? 'bg-purple-50 text-purple-700' : 'bg-amber-50 text-amber-700';
                 return (
-                  <div key={reg.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className={`h-1 ${isActive ? 'bg-red-500' : isEnded ? 'bg-slate-300' : 'bg-[#00694c]'}`} />
+                  <div key={reg.id} className={`bg-white rounded-2xl shadow-sm overflow-hidden border ${isRRReg ? 'border-purple-200' : 'border-slate-200'}`}>
+                    <div className={`h-1 ${isActive ? 'bg-red-500' : isEnded ? 'bg-slate-300' : isRRReg ? 'bg-purple-400' : 'bg-[#00694c]'}`} />
                     <div className="p-5 flex flex-col sm:flex-row sm:items-center gap-4">
                       {/* Session info */}
                       <div className="flex-1 min-w-0">
@@ -422,18 +423,23 @@ export default function BookingsHistory({
                             </span>
                           )}
                           {isEnded && <span className="text-[9px] font-black uppercase bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Ended</span>}
-                          {!isActive && !isEnded && <span className="text-[9px] font-black uppercase bg-[#00694c]/10 text-[#00694c] px-2 py-0.5 rounded-full">Upcoming</span>}
+                          {!isActive && !isEnded && <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${isRRReg ? 'bg-purple-100 text-purple-700' : 'bg-[#00694c]/10 text-[#00694c]'}`}>Upcoming</span>}
                           <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${statusColor}`}>{statusLabel}</span>
+                          {isRRReg && <span className="text-[9px] font-black uppercase bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">🔵 Round-Robin</span>}
                         </div>
                         <p className="font-extrabold text-slate-900 text-base">{s?.court_name ?? 'Open Play'}</p>
                         <p className="text-xs text-slate-500 mt-0.5">
                           {s?.date} · {s?.start_time?.slice(0,5)}–{s?.end_time?.slice(0,5)}
-                          <span className="ml-2 capitalize">{s?.skill_filter === 'all' ? '· All levels' : `· ${s?.skill_filter} only`}</span>
+                          {!isRRReg && <span className="ml-2 capitalize">{s?.skill_filter === 'all' ? '· All levels' : `· ${s?.skill_filter} only`}</span>}
                         </p>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          Registered {new Date(reg.registered_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          {' · '}<span className="capitalize">{reg.skill_tier}</span>
-                        </p>
+                        {isRRReg && !isActive ? (
+                          <p className="text-xs text-purple-500 mt-0.5 font-semibold">Teams are formed automatically when the session starts</p>
+                        ) : (
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            Registered {new Date(reg.registered_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {' · '}<span className="capitalize">{reg.skill_tier}</span>
+                          </p>
+                        )}
                       </div>
 
                       {/* Stats */}

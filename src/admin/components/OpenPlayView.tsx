@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import { Plus, X, Users, Play, Trophy, Clock, Shield, CheckCircle } from 'lucide-react';
 import { supabase, isSupabaseEnabled } from '../../lib/supabase';
 import {
-  makeMatch, PLAYERS_PER_MATCH, generateRoundRobinSchedule, sortStandings,
+  makeMatch, PLAYERS_PER_MATCH, generateRoundRobinSchedule, sortStandings, pairRegistrationsIntoTeams,
 } from '../../lib/openPlayMatchmaking';
 import type { BalanceMode, RRTeam } from '../../lib/openPlayMatchmaking';
 
@@ -468,7 +468,7 @@ function CreateSessionModal({ courts, onClose, onCreated }: {
             <div className="grid grid-cols-2 gap-1.5">
               {([
                 { value: 'rotation' as const, label: 'Rotation', desc: 'Open pool, continuous play' },
-                { value: 'round_robin' as const, label: 'Round-Robin', desc: 'Teams play everyone' },
+                { value: 'round_robin' as const, label: 'Round-Robin', desc: 'Players register solo — teams randomly formed at start' },
               ]).map(f => (
                 <button key={f.value} type="button" onClick={() => setSessionType(f.value)}
                   className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all text-left ${
@@ -1233,17 +1233,60 @@ export default function OpenPlayView() {
     if (!selectedSessionId || !isSupabaseEnabled || !supabase || !selectedSession) return;
 
     if (selectedSession.session_type === 'round_robin') {
-      if (rrTeams.length < 2) {
-        alert('Need at least 2 teams to start a Round-Robin session.');
+      // 1. Fetch all checked-in waiting registrations
+      const { data: regs } = await supabase
+        .from('open_play_registrations')
+        .select('id, player_name, skill_tier')
+        .eq('session_id', selectedSessionId)
+        .eq('status', 'waiting')
+        .eq('is_present', true);
+
+      const registrants = (regs ?? []) as { id: string; player_name: string; skill_tier: string }[];
+      if (registrants.length < 2) {
+        alert('Need at least 2 checked-in players to start a Round-Robin session. Mark players present first.');
         return;
       }
+
+      // 2. System-pair into teams
+      const { teams: formed, alternate } = pairRegistrationsIntoTeams(
+        registrants.map(r => ({ id: r.id, player_name: r.player_name, skill_tier: r.skill_tier as any })),
+        selectedSession.skill_balance_mode === 'skill_aware'
+      );
+
+      // 3. Insert teams
+      const { data: insertedTeams } = await supabase
+        .from('open_play_teams')
+        .insert(formed.map((t, i) => ({
+          session_id: selectedSessionId,
+          player1_name: t.player1.player_name,
+          player2_name: t.player2.player_name,
+          email: null,
+          reg1_id: t.player1.id,
+          reg2_id: t.player2.id,
+        })))
+        .select('id, player1_name, player2_name');
+
+      // 4. Mark alternate registration (if odd count) so it's visible in admin
+      if (alternate) {
+        await supabase.from('open_play_registrations')
+          .update({ status: 'alternate' } as any)
+          .eq('id', alternate.id);
+      }
+
       await supabase.from('open_play_sessions').update({ status: 'active' }).eq('id', selectedSessionId);
       await loadSessions();
 
-      const rrTeamList: RRTeam[] = rrTeams.map(t => ({
+      // 5. Generate schedule from formed teams
+      const rrTeamList: RRTeam[] = (insertedTeams ?? []).map((t: any) => ({
         id: t.id,
         name: `${t.player1_name} & ${t.player2_name}`,
       }));
+
+      if (rrTeamList.length < 2) {
+        alert('Team insertion failed — check Supabase logs.');
+        return;
+      }
+
       const schedule = generateRoundRobinSchedule(rrTeamList);
       const matchInserts = schedule.map(m => ({
         session_id: selectedSessionId,
@@ -1577,24 +1620,62 @@ export default function OpenPlayView() {
                   </div>
                 )}
 
-                {/* Round-Robin: Teams Panel */}
-                {isRR && (
+                {/* Round-Robin: Pre-start — show registered players waiting to be paired */}
+                {isRR && selectedSession.status === 'upcoming' && (
                   <div className="bg-white border border-outline-variant/40 rounded-2xl p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-outline" />
-                        <span className="text-xs font-black uppercase tracking-widest text-outline">Teams</span>
-                        <span className="text-xs font-black text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">{rrTeams.length}</span>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Users className="w-4 h-4 text-outline" />
+                      <span className="text-xs font-black uppercase tracking-widest text-outline">Registered Players</span>
+                      <span className="text-xs font-black text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">{registrations.filter(r => r.status === 'waiting').length}</span>
+                    </div>
+                    {registrations.filter(r => r.status === 'waiting').length === 0 ? (
+                      <p className="text-xs text-on-surface-variant text-center py-4">No players registered yet</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {registrations.filter(r => r.status === 'waiting').map((r, i) => (
+                          <div key={r.id} className="flex items-center justify-between bg-surface-container-low/40 rounded-lg px-3 py-2">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-black text-outline w-4">#{i + 1}</span>
+                              <TierDot tier={r.skill_tier} />
+                              <span className="text-sm font-semibold text-on-surface">{r.player_name}</span>
+                              {!r.is_present && <span className="text-[9px] text-amber-600 font-bold">not checked in</span>}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <TierChip tier={r.skill_tier} />
+                              {!r.is_present && (
+                                <button onClick={() => markPresent(r.id)}
+                                  className="flex items-center gap-1 text-[10px] font-black text-green-700 bg-green-100 hover:bg-green-200 px-2 py-0.5 rounded transition-colors">
+                                  <CheckCircle className="w-3 h-3" /> Check In
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      {selectedSession.status === 'upcoming' && (
-                        <button onClick={() => { setEditTeam(undefined); setShowAddTeam(true); }}
-                          className="flex items-center gap-1 text-xs font-bold text-primary hover:bg-primary/5 px-2 py-1 rounded-lg">
-                          <Plus className="w-3 h-3" /> Add Team
-                        </button>
+                    )}
+                    <p className="text-[10px] text-outline mt-3 text-center">
+                      Teams are formed automatically when you click Start Session.
+                      {registrations.filter(r => r.status === 'waiting' && r.is_present).length >= 2 && (
+                        <span className="block text-primary font-black mt-0.5">
+                          {registrations.filter(r => r.status === 'waiting' && r.is_present).length} checked-in →{' '}
+                          {Math.floor(registrations.filter(r => r.status === 'waiting' && r.is_present).length / 2)} teams
+                          {registrations.filter(r => r.status === 'waiting' && r.is_present).length % 2 === 1 ? ' + 1 alternate' : ''}
+                        </span>
                       )}
+                    </p>
+                  </div>
+                )}
+
+                {/* Round-Robin: Post-start — show formed teams + alternate */}
+                {isRR && selectedSession.status !== 'upcoming' && (
+                  <div className="bg-white border border-outline-variant/40 rounded-2xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Users className="w-4 h-4 text-outline" />
+                      <span className="text-xs font-black uppercase tracking-widest text-outline">Teams</span>
+                      <span className="text-xs font-black text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">{rrTeams.length}</span>
                     </div>
                     {rrTeams.length === 0 ? (
-                      <p className="text-xs text-on-surface-variant text-center py-4">No teams yet — add teams before starting</p>
+                      <p className="text-xs text-on-surface-variant text-center py-4">No teams formed yet</p>
                     ) : (
                       <div className="space-y-2">
                         {rrTeams.map((t, i) => (
@@ -1604,31 +1685,29 @@ export default function OpenPlayView() {
                                 <span className="text-[10px] font-black text-outline">#{i + 1}</span>
                                 <span className="text-sm font-semibold text-on-surface">{t.player1_name} & {t.player2_name}</span>
                               </div>
-                              {selectedSession.status !== 'upcoming' && (
-                                <span className="text-[10px] text-outline ml-4">{t.wins}W–{t.losses}L</span>
-                              )}
+                              <span className="text-[10px] text-outline ml-4">{t.wins}W–{t.losses}L</span>
                             </div>
-                            {selectedSession.status === 'upcoming' && (
-                              <div className="flex gap-1">
-                                <button onClick={() => { setEditTeam(t); setShowAddTeam(true); }}
-                                  className="text-[10px] font-bold text-outline hover:text-primary px-1.5 py-0.5 rounded border border-outline-variant transition-colors">
-                                  Edit
-                                </button>
-                                <button onClick={() => deleteTeam(t.id)}
-                                  className="text-[10px] font-bold text-red-400 hover:text-red-600 px-1.5 py-0.5 rounded border border-red-200 transition-colors">
-                                  ✕
-                                </button>
-                              </div>
-                            )}
+                            <button onClick={() => { setEditTeam(t); setShowAddTeam(true); }}
+                              className="text-[10px] font-bold text-outline hover:text-primary px-1.5 py-0.5 rounded border border-outline-variant transition-colors">
+                              Edit
+                            </button>
+                          </div>
+                        ))}
+                        {/* Alternate — player who didn't get paired due to odd count */}
+                        {registrations.filter(r => (r as any).status === 'alternate').map(r => (
+                          <div key={r.id} className="flex items-center justify-between bg-amber-50 rounded-lg px-3 py-2 border border-amber-200">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-black text-amber-600 uppercase">Alternate</span>
+                              <span className="text-sm font-semibold text-on-surface">{r.player_name}</span>
+                            </div>
+                            <span className="text-[9px] text-amber-600">Available if a team needs sub</span>
                           </div>
                         ))}
                       </div>
                     )}
-                    {rrTeams.length >= 2 && selectedSession.status === 'upcoming' && (
-                      <p className="text-[10px] text-outline mt-2 text-center">
-                        {rrTeams.length} teams → {(rrTeams.length * (rrTeams.length - 1)) / 2} matches
-                      </p>
-                    )}
+                    <p className="text-[10px] text-outline mt-2 text-center">
+                      {rrTeams.length} teams → {(rrTeams.length * (rrTeams.length - 1)) / 2} matches
+                    </p>
                   </div>
                 )}
 
