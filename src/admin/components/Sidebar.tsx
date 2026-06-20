@@ -9,6 +9,7 @@ import {
   Banknote,
   Menu,
   X,
+  Users,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -31,6 +32,7 @@ export default function Sidebar({ onNewBookingClick, newBookingCount = 0, onClea
     { id: 'bookings', label: 'Bookings', icon: Calendar, path: '/admin/bookings', badge: newBookingCount },
     { id: 'walkin', label: 'Walk-in', icon: UserPlus, path: '/admin/walkin', badge: 0 },
     { id: 'payments', label: 'Payments', icon: Banknote, path: '/admin/payments', badge: pendingPaymentsCount },
+    { id: 'users', label: 'Users', icon: Users, path: '/admin/users', badge: 0 },
   ] as const;
 
   const isActive = (path: string) => {

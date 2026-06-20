@@ -16,6 +16,7 @@ import { useToast, ToastContainer } from '../components/Toast';
 import ConfirmModal, { ConfirmOptions } from '../components/ConfirmModal';
 import WalkinView from './components/WalkinView';
 import PaymentsView from './components/PaymentsView';
+import UsersView from './components/UsersView';
 
 interface Props {
   role: 'user' | 'admin' | null;
@@ -420,6 +421,8 @@ export default function AdminApp({ role, onLogin, onLogout, currentUser }: Props
                 onPaymentActioned={loadBookings}
               />
             } />
+
+            <Route path="/users" element={<UsersView />} />
 
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Routes>
