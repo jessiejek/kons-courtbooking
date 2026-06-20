@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseEnabled } from '../../lib/supabase';
+import { makeMatch } from '../../lib/openPlayMatchmaking';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -83,13 +84,18 @@ export default function OpenPlayLive() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [registrations, setRegistrations] = useState<OPRegistration[]>([]);
   const [activeGame, setActiveGame] = useState<OPGame | null>(null);
-  const [nextGame, setNextGame] = useState<OPGame | null>(null);
   const [loading, setLoading] = useState(true);
   // Fix F: transient winner announcement state, auto-clears after 8 seconds
   const [announcement, setAnnouncement] = useState<WinnerAnnouncement | null>(null);
 
   const session = sessions.find(s => s.id === selectedId);
   const waitingPool = registrations.filter(r => r.status === 'waiting');
+  // Fix G: compute "Up Next" from the waiting pool using the same makeMatch logic.
+  // Only shown when there's no active game (i.e. between matches).
+  const balanceMode = (session as any)?.skill_balance_mode ?? 'arrival_order';
+  const upNextMatch = !activeGame && waitingPool.length >= 4
+    ? makeMatch(waitingPool, balanceMode)
+    : null;
   const leaderboard = [...registrations]
     .filter(r => r.games_played > 0)
     .sort((a, b) => b.consecutive_wins - a.consecutive_wins || b.games_played - a.games_played)
@@ -125,7 +131,8 @@ export default function OpenPlayLive() {
     if (regs) setRegistrations(regs);
     if (games) {
       setActiveGame(games[0] ?? null);
-      setNextGame(games[1] ?? null);
+      // Fix G: nextGame was read from games[1] which is always null (single-active-game guard).
+      // Now computed from the waiting pool directly (see upNextMatch below).
     }
   }, [selectedId]);
 
@@ -352,37 +359,34 @@ export default function OpenPlayLive() {
               </div>
             )}
 
-            {/* Up Next */}
-            {nextGame && (
+            {/* Fix G: Up Next — computed from waiting pool, not from dead games[1] */}
+            {upNextMatch && (
               <div className="bg-[#111c15] border border-[#1d4ed820] rounded-2xl p-4">
-                <div className="text-[10px] font-black uppercase tracking-widest text-blue-400 mb-3">⏭ Up Next</div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-blue-400">⏭ Up Next</div>
+                  <div className="text-[9px] text-[#4b5563] italic">projected from pool</div>
+                </div>
                 <div className="grid grid-cols-[1fr_40px_1fr] gap-3 items-center">
                   <div className="space-y-1.5">
-                    {nextGame.team_a.map(id => {
-                      const p = getPlayer(id);
-                      return p ? (
-                        <div key={id} className="flex items-center gap-2">
-                          <TierDot tier={p.skill_tier} />
-                          <span className="text-sm font-semibold text-[#d1d5db]">{p.player_name}</span>
-                          <span className="text-[9px] text-[#4b5563]">{TIER_LABEL[p.skill_tier]}</span>
-                        </div>
-                      ) : null;
-                    })}
+                    {upNextMatch[0].map(p => (
+                      <div key={p.id} className="flex items-center gap-2">
+                        <TierDot tier={p.skill_tier} />
+                        <span className="text-sm font-semibold text-[#d1d5db]">{p.player_name}</span>
+                        <span className="text-[9px] text-[#4b5563]">{TIER_LABEL[p.skill_tier]}</span>
+                      </div>
+                    ))}
                   </div>
                   <div className="flex items-center justify-center">
                     <div className="w-8 h-8 rounded-full border border-[#374151] flex items-center justify-center text-[10px] font-black text-[#6b7280]">VS</div>
                   </div>
                   <div className="space-y-1.5">
-                    {nextGame.team_b.map(id => {
-                      const p = getPlayer(id);
-                      return p ? (
-                        <div key={id} className="flex items-center justify-end gap-2">
-                          <span className="text-[9px] text-[#4b5563]">{TIER_LABEL[p.skill_tier]}</span>
-                          <span className="text-sm font-semibold text-[#d1d5db]">{p.player_name}</span>
-                          <TierDot tier={p.skill_tier} />
-                        </div>
-                      ) : null;
-                    })}
+                    {upNextMatch[1].map(p => (
+                      <div key={p.id} className="flex items-center justify-end gap-2">
+                        <span className="text-[9px] text-[#4b5563]">{TIER_LABEL[p.skill_tier]}</span>
+                        <span className="text-sm font-semibold text-[#d1d5db]">{p.player_name}</span>
+                        <TierDot tier={p.skill_tier} />
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
