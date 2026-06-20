@@ -58,7 +58,6 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
       .from('open_play_sessions')
       .select('id, court_id, date, start_time, end_time, skill_filter, status')
       .in('status', ['upcoming', 'active'])
-      .gte('date', new Date().toISOString().split('T')[0])
       .order('date', { ascending: true })
       .limit(1)
       .maybeSingle()
