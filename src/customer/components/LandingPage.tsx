@@ -41,6 +41,8 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dismissedAnnouncements, setDismissedAnnouncements] = useState<Set<string>>(new Set());
   const [liveCourts, setLiveCourts] = useState<LiveCourt[]>([]);
+  const [openPlaySession, setOpenPlaySession] = useState<{ id: string; court_name: string; date: string; start_time: string; end_time: string; skill_filter: string; status: string } | null>(null);
+  const [openPlayDismissed, setOpenPlayDismissed] = useState(false);
   const liveAnnouncements = useRealtimeAnnouncements();
   const visibleAnnouncements = liveAnnouncements.filter((a) => !dismissedAnnouncements.has(a.id));
 
@@ -48,6 +50,25 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
     if (!isSupabaseEnabled || !supabase) return;
     supabase.from('courts').select('slug, name, surface_type, default_price, status').neq('status', 'inactive').order('id')
       .then(({ data }) => { if (data) setLiveCourts(data as LiveCourt[]); });
+  }, []);
+
+  useEffect(() => {
+    if (!isSupabaseEnabled || !supabase) return;
+    supabase
+      .from('open_play_sessions')
+      .select('id, court_id, date, start_time, end_time, skill_filter, status')
+      .in('status', ['upcoming', 'active'])
+      .gte('date', new Date().toISOString().split('T')[0])
+      .order('date', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return;
+        supabase!.from('courts').select('name').eq('id', data.court_id).single()
+          .then(({ data: court }) => {
+            setOpenPlaySession({ ...data, court_name: court?.name ?? `Court ${data.court_id}` });
+          });
+      });
   }, []);
 
   // Merge live data over static (for images + ratings which aren't in DB)
@@ -237,6 +258,40 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
         </div>
       )}
 
+      {/* ── OPEN PLAY BANNER ───────────────────────────────────── */}
+      {openPlaySession && !openPlayDismissed && (
+        <div className="fixed top-[72px] left-0 right-0 z-39 bg-[#00694c] text-white">
+          <div className="max-w-7xl mx-auto px-5 py-2.5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="shrink-0 flex items-center gap-1.5 font-black text-[10px] uppercase tracking-widest bg-white/20 px-2 py-0.5 rounded">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#00ff88] animate-pulse" />
+                {openPlaySession.status === 'active' ? 'Live Now' : 'Today'}
+              </span>
+              <span className="text-sm font-semibold truncate">
+                🏓 Open Play — {openPlaySession.court_name} · {openPlaySession.start_time.slice(0,5)}–{openPlaySession.end_time.slice(0,5)}
+                <span className="ml-2 opacity-75 capitalize text-xs">
+                  {openPlaySession.skill_filter === 'all' ? 'All levels' : openPlaySession.skill_filter}
+                </span>
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <a href="/open-play/live" target="_blank"
+                className="text-[11px] font-bold underline underline-offset-2 opacity-80 hover:opacity-100 hidden sm:block">
+                Live View
+              </a>
+              <button
+                onClick={() => window.location.href = `/open-play/register?session=${openPlaySession.id}`}
+                className="bg-white text-[#00694c] text-xs font-black px-3 py-1.5 rounded-lg hover:bg-green-50 transition-colors">
+                Register →
+              </button>
+              <button onClick={() => setOpenPlayDismissed(true)} className="opacity-60 hover:opacity-100 transition-opacity">
+                <XIcon className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── HERO ───────────────────────────────────────────────── */}
       <section className="relative min-h-screen flex flex-col overflow-hidden">
         <div className="absolute inset-0">
@@ -270,6 +325,27 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
             Four professional-grade courts. Real-time online booking. Climate-controlled lounges.
             Sunshine Pickleball Courts — where every match feels like a championship.
           </p>
+
+          {/* Open Play hero card */}
+          {openPlaySession && (
+            <div className="mb-6 bg-white/10 border border-[#00ff88]/30 backdrop-blur-sm rounded-2xl px-6 py-4 flex flex-col sm:flex-row items-center gap-4 max-w-lg mx-auto">
+              <div className="text-left flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-2 h-2 rounded-full bg-[#00ff88] animate-pulse" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-[#00ff88]">
+                    {openPlaySession.status === 'active' ? 'Open Play Live Now' : 'Open Play Today'}
+                  </span>
+                </div>
+                <p className="text-white font-bold text-sm">{openPlaySession.court_name} · {openPlaySession.start_time.slice(0,5)}–{openPlaySession.end_time.slice(0,5)}</p>
+                <p className="text-white/60 text-xs capitalize mt-0.5">{openPlaySession.skill_filter === 'all' ? 'All skill levels welcome' : `${openPlaySession.skill_filter} players only`}</p>
+              </div>
+              <button
+                onClick={() => window.location.href = `/open-play/register?session=${openPlaySession.id}`}
+                className="shrink-0 bg-[#00ff88] text-[#003d2a] text-xs font-black px-5 py-2.5 rounded-xl hover:bg-[#00e87c] transition-colors">
+                Register Now →
+              </button>
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
