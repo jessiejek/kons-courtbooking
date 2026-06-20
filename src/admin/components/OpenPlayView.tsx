@@ -162,10 +162,13 @@ function ScoringPanel({ game, registrations, maxScore, onGameEnd, onUpdate }: Sc
 
   const getSide = (team: 'A' | 'B') => (team === 'A' ? sA : sB) % 2 === 0 ? 'Right' : 'Left';
 
-  const isGameOver = (a: number, b: number) =>
-    (a >= maxScore || b >= maxScore) && Math.abs(a - b) >= 2;
-
+  // Game ends when someone reaches maxScore AND leads by 2
+  // After deuce (both at maxScore-1), keep playing until 2-point lead — no cap
   const isDeuce = (a: number, b: number) => a >= (maxScore - 1) && b >= (maxScore - 1);
+  const isGameOver = (a: number, b: number) => {
+    if (isDeuce(a, b)) return Math.abs(a - b) >= 2;
+    return (a >= maxScore || b >= maxScore) && Math.abs(a - b) >= 2;
+  };
 
   const saveHistory = () =>
     setHistory(h => [...h, { sA, sB, servingTeam, serverIdx, firstServeDone }]);
