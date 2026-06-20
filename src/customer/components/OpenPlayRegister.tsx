@@ -212,8 +212,6 @@ export default function OpenPlayRegister({ currentUser, onOpenLogin }: Props) {
   }
 
   // ── Registration form ───────────────────────────────────────────────────────
-  const skillOk = session.skill_filter === 'all' || tier === session.skill_filter;
-
   return (
     <div className="min-h-screen bg-[#0a1a12] text-white flex flex-col items-center justify-start pt-10 px-4 pb-16">
       {/* Back */}
