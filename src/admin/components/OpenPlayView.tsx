@@ -739,29 +739,30 @@ export default function OpenPlayView() {
     setActiveGame(game);
   };
 
+  // Returns MAX(entered_pool_at) across all waiting players in the session
+  const getMaxPoolTime = async (): Promise<number> => {
+    const { data } = await supabase!
+      .from('open_play_registrations')
+      .select('entered_pool_at')
+      .eq('session_id', selectedSessionId!)
+      .eq('status', 'waiting')
+      .order('entered_pool_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return data ? new Date(data.entered_pool_at).getTime() : Date.now();
+  };
+
   const handleGameEnd = async (winner: 'A' | 'B', _sA: number, _sB: number) => {
     if (!activeGame || !isSupabaseEnabled || !supabase) return;
 
     const winnerIds = winner === 'A' ? activeGame.team_a : activeGame.team_b;
-    const loserIds = winner === 'A' ? activeGame.team_b : activeGame.team_a;
+    const loserIds  = winner === 'A' ? activeGame.team_b : activeGame.team_a;
 
-    const now = Date.now();
-    // Losers go to pool first (current time) — they wait less next round
-    // Winners go to back of pool (now + 1 hour offset) — they just won, others go first
-    const loserTime  = new Date(now).toISOString();
-    const winnerTime = new Date(now + 60 * 60 * 1000).toISOString();
-
-    for (const id of winnerIds) {
-      const reg = registrations.find(r => r.id === id);
-      const newWins = (reg?.consecutive_wins ?? 0) + 1;
-      const bumped = newWins >= 3;
-      await supabase.from('open_play_registrations').update({
-        status: 'waiting',
-        games_played: (reg?.games_played ?? 0) + 1,
-        consecutive_wins: bumped ? 0 : newWins,
-        entered_pool_at: winnerTime, // winners go to back
-      }).eq('id', id);
-    }
+    // Fix 1: relative timestamps — always sort after every currently-waiting player.
+    // Losers: MAX(waiting.entered_pool_at) + 1s
+    // Winners: re-query MAX after losers inserted + 1s  → winners always after losers
+    const maxBefore   = await getMaxPoolTime();
+    const loserTime   = new Date(maxBefore + 1000).toISOString();
 
     for (const id of loserIds) {
       const reg = registrations.find(r => r.id === id);
@@ -769,7 +770,22 @@ export default function OpenPlayView() {
         status: 'waiting',
         games_played: (reg?.games_played ?? 0) + 1,
         consecutive_wins: 0,
-        entered_pool_at: loserTime, // losers go ahead of winners
+        entered_pool_at: loserTime,
+      }).eq('id', id);
+    }
+
+    const maxAfterLosers = await getMaxPoolTime();
+    const winnerTime     = new Date(maxAfterLosers + 1000).toISOString();
+
+    for (const id of winnerIds) {
+      const reg = registrations.find(r => r.id === id);
+      const newWins = (reg?.consecutive_wins ?? 0) + 1;
+      const bumped  = newWins >= 3;
+      await supabase.from('open_play_registrations').update({
+        status: 'waiting',
+        games_played: (reg?.games_played ?? 0) + 1,
+        consecutive_wins: bumped ? 0 : newWins,
+        entered_pool_at: winnerTime,
       }).eq('id', id);
     }
 
