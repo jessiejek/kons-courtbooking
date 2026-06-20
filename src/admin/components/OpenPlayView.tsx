@@ -145,6 +145,13 @@ function ScoringPanel({ game, registrations, maxScore, onGameEnd, onUpdate, rrMo
 
   const getSide = (team: 'A' | 'B') => (team === 'A' ? sA : sB) % 2 === 0 ? 'Right' : 'Left';
 
+  const isDeuce = (a: number, b: number) => a >= 10 && b >= 10;
+  const isGameOver = (a: number, b: number) => {
+    if (a >= maxScore || b >= maxScore) return true;
+    if (isDeuce(a, b)) return Math.abs(a - b) >= 2;
+    return (a >= 11 || b >= 11) && Math.abs(a - b) >= 2;
+  };
+
   // Compute who serves next (mirrors doSideOut logic, read-only)
   const nextServer = (() => {
     let nTeam = servingTeam;
@@ -160,18 +167,6 @@ function ScoringPanel({ game, registrations, maxScore, onGameEnd, onUpdate, rrMo
     const regs = nTeam === 'A' ? teamARegs : teamBRegs;
     return regs[nIdx]?.player_name ?? `Player ${nIdx + 1}`;
   })();
-
-  // Pickleball scoring rules (DO NOT MODIFY):
-  // - First to 11 wins, must win by 2
-  // - 10-10: keep playing, win by 2 (need 12)
-  // - 11-11: keep playing, win by 2 (need 13)
-  // - Once someone reaches maxScore (admin cap e.g. 15): they win immediately
-  const isDeuce = (a: number, b: number) => a >= 10 && b >= 10;
-  const isGameOver = (a: number, b: number) => {
-    if (a >= maxScore || b >= maxScore) return true;
-    if (isDeuce(a, b)) return Math.abs(a - b) >= 2;
-    return (a >= 11 || b >= 11) && Math.abs(a - b) >= 2;
-  };
 
   const saveHistory = () =>
     setHistory(h => [...h, { sA, sB, servingTeam, serverIdx, firstServeDone }]);
