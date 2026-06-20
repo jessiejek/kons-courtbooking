@@ -680,13 +680,26 @@ export default function OpenPlayView() {
     }
   }, [selectedSessionId]);
 
-  // Realtime: auto-refresh when players register online or pool changes
+  // Realtime: auto-refresh pool; auto-trigger match when 4th player joins (Fix 2)
   useEffect(() => {
     if (!selectedSessionId || !isSupabaseEnabled || !supabase) return;
     const ch = supabase
       .channel(`admin-op-${selectedSessionId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'open_play_registrations', filter: `session_id=eq.${selectedSessionId}` },
-        () => loadRegistrations())
+        async (payload: any) => {
+          await loadRegistrations();
+          // Fix 2: if a new registration pushed the waiting pool to 4, auto-generate
+          if (payload.eventType === 'INSERT' || (payload.new?.status === 'waiting' && payload.old?.status !== 'waiting')) {
+            const { data: waiters } = await supabase!
+              .from('open_play_registrations')
+              .select('id', { count: 'exact', head: true })
+              .eq('session_id', selectedSessionId)
+              .eq('status', 'waiting');
+            // @ts-ignore — count is on the response
+            const count = (waiters as any)?.length ?? 0;
+            if (count >= 4) generateNextMatch();
+          }
+        })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'open_play_games', filter: `session_id=eq.${selectedSessionId}` },
         () => loadActiveGame())
       .subscribe();
@@ -703,7 +716,7 @@ export default function OpenPlayView() {
   const generateNextMatch = async () => {
     if (!selectedSessionId || !isSupabaseEnabled || !supabase) return;
 
-    // Guard: don't create a new game if one is already active
+    // Guard: don't create a new game if one is already active (Fix 4: prevents race duplicates)
     const { data: existing } = await supabase
       .from('open_play_games')
       .select('id')
@@ -719,6 +732,7 @@ export default function OpenPlayView() {
       .eq('status', 'waiting')
       .order('entered_pool_at', { ascending: true });
 
+    // Fix 2: surface awaiting_players state — auto-retry fires via Realtime when 4th player joins
     if (!pool || pool.length < 4) { await loadRegistrations(); return; }
 
     const match = makeMatch(pool);
@@ -1000,9 +1014,9 @@ export default function OpenPlayView() {
                     ) : (
                       <>
                         <div className="text-3xl mb-3">⏳</div>
-                        <p className="font-bold text-on-surface mb-1">Waiting for players</p>
+                        <p className="font-bold text-on-surface mb-1">Waiting for players ({waitingPool.length}/4 ready)</p>
                         <p className="text-sm text-on-surface-variant">
-                          Need at least 4 players in the pool
+                          Need {4 - waitingPool.length} more player{4 - waitingPool.length !== 1 ? 's' : ''} — match generates automatically
                         </p>
                       </>
                     )}
