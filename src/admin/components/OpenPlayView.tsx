@@ -201,7 +201,7 @@ function ScoringPanel({ game, registrations, maxScore, onGameEnd, onUpdate }: Sc
       score_a: newA, score_b: newB,
       serving_team: servingTeam, server_index: serverIdx, first_serve_done: firstServeDone,
     });
-    if (isGameOver(newA, newB)) setTimeout(() => setScreen('over'), 300);
+    if (isGameOver(newA, newB)) setScreen('over');
   };
 
   const doSideOut = async () => {
