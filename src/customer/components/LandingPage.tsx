@@ -300,7 +300,7 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
                         }
                       }}
                       className="bg-white text-[#00694c] text-xs font-black px-3 py-1.5 rounded-lg hover:bg-green-50 transition-colors">
-                      {currentUser ? 'Register →' : 'Login to Register →'}
+                      Register Now →
                     </button>
                   )}
                 </div>
