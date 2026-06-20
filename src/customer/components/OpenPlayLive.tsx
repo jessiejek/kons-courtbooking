@@ -395,7 +395,7 @@ export default function OpenPlayLive() {
               <p className="text-sm font-bold text-white">{session.court_name}</p>
               <p className="text-xs text-[#4b5563] mt-1">{session.date} · {session.start_time.slice(0,5)} – {session.end_time.slice(0,5)}</p>
               <p className="text-xs text-[#4b5563] capitalize mt-0.5">
-                {session.skill_filter === 'all' ? 'All levels welcome' : `${session.skill_filter} only`} · First to {session.max_score}
+                {session.skill_filter === 'all' ? 'All levels welcome' : `${session.skill_filter} only`} · First to 11 (deuce cap {session.max_score})
               </p>
             </div>
           </div>
