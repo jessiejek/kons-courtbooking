@@ -71,6 +71,13 @@ function Clock() {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
+interface WinnerAnnouncement {
+  winnerTeam: 'A' | 'B';
+  winnerNames: string[];
+  scoreA: number;
+  scoreB: number;
+}
+
 export default function OpenPlayLive() {
   const [sessions, setSessions] = useState<OPSession[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -78,6 +85,8 @@ export default function OpenPlayLive() {
   const [activeGame, setActiveGame] = useState<OPGame | null>(null);
   const [nextGame, setNextGame] = useState<OPGame | null>(null);
   const [loading, setLoading] = useState(true);
+  // Fix F: transient winner announcement state, auto-clears after 8 seconds
+  const [announcement, setAnnouncement] = useState<WinnerAnnouncement | null>(null);
 
   const session = sessions.find(s => s.id === selectedId);
   const waitingPool = registrations.filter(r => r.status === 'waiting');
@@ -130,7 +139,31 @@ export default function OpenPlayLive() {
     const gameChannel = supabase
       .channel(`live-game-${selectedId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'open_play_games', filter: `session_id=eq.${selectedId}` },
-        () => loadData())
+        (payload: any) => {
+          // Fix F: detect game-end transition and show winner announcement for 8s
+          if (payload.eventType === 'UPDATE' &&
+              payload.new?.status === 'ended' &&
+              payload.old?.status !== 'ended' &&
+              payload.new?.winner_team) {
+            const winner: 'A' | 'B' = payload.new.winner_team;
+            const winnerIds: string[] = winner === 'A' ? payload.new.team_a : payload.new.team_b;
+            // Look up names from current registrations snapshot
+            setRegistrations(currentRegs => {
+              const names = winnerIds.map(
+                (id: string) => currentRegs.find(r => r.id === id)?.player_name ?? 'Player'
+              );
+              setAnnouncement({
+                winnerTeam: winner,
+                winnerNames: names,
+                scoreA: payload.new.score_a,
+                scoreB: payload.new.score_b,
+              });
+              return currentRegs;
+            });
+            setTimeout(() => setAnnouncement(null), 8000);
+          }
+          loadData();
+        })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'open_play_registrations', filter: `session_id=eq.${selectedId}` },
         () => loadData())
       .subscribe();
@@ -165,6 +198,23 @@ export default function OpenPlayLive() {
 
   return (
     <div className="min-h-screen bg-[#0a1a12] text-white p-4 lg:p-6">
+
+      {/* Fix F: Winner announcement overlay — auto-dismisses after 8 seconds */}
+      {announcement && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-gradient-to-b from-[#0d2418] to-[#0a1a12] border-2 border-[#00694c] rounded-3xl p-10 text-center max-w-sm w-full mx-4 shadow-2xl animate-pulse-once">
+            <div className="text-6xl mb-3">🏅</div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#00694c] mb-2">Game Over</p>
+            <p className="text-4xl font-black text-white mb-1">
+              {announcement.scoreA} – {announcement.scoreB}
+            </p>
+            <p className="text-[#00ff88] font-black text-xl mb-4">
+              {announcement.winnerNames.join(' & ')} win!
+            </p>
+            <p className="text-[#4b5563] text-xs">Next match loading…</p>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
