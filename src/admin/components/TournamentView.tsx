@@ -24,6 +24,7 @@ interface Tournament {
   status: 'registration' | 'seeding' | 'active' | 'completed';
   max_players: number;
   skill_filter: string;
+  shuffle_every_round: boolean;
 }
 
 interface OPGame {
@@ -79,6 +80,7 @@ function CreateTournamentModal({ onClose, onCreate }: { onClose: () => void; onC
   const [name, setName] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [maxPlayers, setMaxPlayers] = useState(12);
+  const [shuffleEveryRound, setShuffleEveryRound] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -87,6 +89,7 @@ function CreateTournamentModal({ onClose, onCreate }: { onClose: () => void; onC
     setSaving(true);
     const { data, error } = await supabase.from('tournaments').insert({
       name, date, max_players: maxPlayers, status: 'registration', skill_filter: 'all',
+      shuffle_every_round: shuffleEveryRound,
     }).select().single();
     if (!error && data) onCreate(data as Tournament);
     setSaving(false);
@@ -119,6 +122,22 @@ function CreateTournamentModal({ onClose, onCreate }: { onClose: () => void; onC
                   className={`flex-1 py-2 rounded-xl border-2 text-sm font-bold transition-all
                     ${maxPlayers === n ? 'border-primary bg-primary/5 text-primary' : 'border-outline-variant text-outline'}`}>
                   {n} players
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-bold text-outline uppercase tracking-wide block mb-2">Partnerships</label>
+            <div className="flex flex-col gap-2">
+              {[
+                { value: false, label: 'Fixed partners', desc: 'Randomized at seeding, same partners all tournament. Admin can rearrange manually.' },
+                { value: true,  label: 'Shuffle every round', desc: 'Partners re-randomized automatically after each round completes.' },
+              ].map(opt => (
+                <button key={String(opt.value)} type="button" onClick={() => setShuffleEveryRound(opt.value)}
+                  className={`text-left px-4 py-3 rounded-xl border-2 transition-all
+                    ${shuffleEveryRound === opt.value ? 'border-primary bg-primary/5' : 'border-outline-variant hover:border-primary/40'}`}>
+                  <p className={`text-sm font-bold ${shuffleEveryRound === opt.value ? 'text-primary' : 'text-on-surface'}`}>{opt.label}</p>
+                  <p className="text-xs text-outline mt-0.5">{opt.desc}</p>
                 </button>
               ))}
             </div>
@@ -687,7 +706,28 @@ export default function TournamentView() {
     const isWBFinal = currentWB.length === 1;
     const result = advanceRound(selectedId!, currentWB, currentLB, maxWBRound + 1, maxLBRound + 1, isWBFinal);
 
-    const toInsert = [...result.nextWBMatches, ...result.nextLBMatches, ...(result.grandFinal ? [result.grandFinal] : [])];
+    let toInsert = [...result.nextWBMatches, ...result.nextLBMatches, ...(result.grandFinal ? [result.grandFinal] : [])];
+
+    // Shuffle every round: re-randomize player slots across all new pending matches
+    if (tournament?.shuffle_every_round && toInsert.length > 1) {
+      const pending = toInsert.filter(m => m.status === 'pending');
+      if (pending.length > 1) {
+        // collect all player ids from pending matches, shuffle, re-assign
+        const ids: (string | null)[] = pending.flatMap(m => [m.team_a_p1, m.team_a_p2, m.team_b_p1, m.team_b_p2]);
+        const players = ids.filter(Boolean) as string[];
+        const shuffled = [...players].sort(() => Math.random() - 0.5);
+        let pi = 0;
+        const reassigned = pending.map(m => ({
+          ...m,
+          team_a_p1: shuffled[pi++] ?? null,
+          team_a_p2: shuffled[pi++] ?? null,
+          team_b_p1: m.team_b_p1 !== null ? (shuffled[pi++] ?? null) : null,
+          team_b_p2: m.team_b_p2 !== null ? (shuffled[pi++] ?? null) : null,
+        }));
+        toInsert = [...toInsert.filter(m => m.status !== 'pending'), ...reassigned];
+      }
+    }
+
     if (toInsert.length > 0) {
       await supabase?.from('tournament_matches').insert(toInsert);
       await loadTournamentData(selectedId!);
