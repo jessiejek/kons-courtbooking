@@ -761,6 +761,7 @@ export default function TournamentView() {
     setTournaments(prev => prev.map(t => t.id === selectedId ? { ...t, status: 'active' } : t));
     await loadTournamentData(selectedId);
     toast('success', 'Bracket locked!', 'Round 1 matches are ready.');
+    setShowRearrange(true);
   };
 
   const handleMatchComplete = async (matchId: string, winnerTeam: 'A' | 'B', scoreA: number, scoreB: number) => {
@@ -821,6 +822,9 @@ export default function TournamentView() {
       await supabase?.from('tournament_matches').insert(toInsert);
       await loadTournamentData(selectedId!);
       toast('info', 'Next round ready', `Round ${maxWBRound + 1} matches generated.`);
+      // Auto-open rearrange modal so admin can adjust before play starts
+      const hasPending = toInsert.some(m => m.status === 'pending');
+      if (hasPending) setShowRearrange(true);
     }
   };
 
