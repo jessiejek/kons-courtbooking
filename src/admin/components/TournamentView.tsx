@@ -637,6 +637,9 @@ export default function TournamentView() {
 
   const handleLockBracket = async () => {
     if (!supabase || !selectedId) return;
+    // Guard: abort if matches already exist (prevents double-insert from double-click / StrictMode)
+    const { data: existing } = await supabase.from('tournament_matches').select('id').eq('tournament_id', selectedId).limit(1);
+    if (existing && existing.length > 0) { toast('warning', 'Bracket already locked', 'Matches already exist.'); return; }
     const r1 = buildRound1Matches(slots, selectedId);
     const { error } = await supabase.from('tournament_matches').insert(r1);
     if (error) { toast('error', 'Failed to lock bracket', error.message); return; }
