@@ -4,7 +4,8 @@ import { COURTS as STATIC_COURTS } from '../data';
 import { supabase, isSupabaseEnabled } from '../../lib/supabase';
 import {
   Calendar, MapPin, Phone, Clock, ArrowRight, ChevronRight,
-  Star, Shield, Zap, Users, CheckCircle, Menu, X as XIcon
+  Star, Shield, Zap, Users, CheckCircle, Menu, X as XIcon,
+  Trophy, Swords,
 } from 'lucide-react';
 
 interface LandingPageProps {
@@ -44,6 +45,7 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
   const [openPlaySessions, setOpenPlaySessions] = useState<{ id: string; court_name: string; date: string; start_time: string; end_time: string; skill_filter: string; status: string; session_type: 'rotation' | 'round_robin' }[]>([]);
   const [openPlayIndex, setOpenPlayIndex] = useState(0);
   const [openPlayDismissed, setOpenPlayDismissed] = useState(false);
+  const [tournaments, setTournaments] = useState<{ id: string; name: string; date: string; status: string; max_players: number; court_name: string | null; start_time: string | null; end_time: string | null }[]>([]);
   const openPlaySession = openPlaySessions[openPlayIndex] ?? null;
   const liveAnnouncements = useRealtimeAnnouncements();
   const visibleAnnouncements = liveAnnouncements.filter((a) => !dismissedAnnouncements.has(a.id));
@@ -52,6 +54,16 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
     if (!isSupabaseEnabled || !supabase) return;
     supabase.from('courts').select('slug, name, surface_type, default_price, status').neq('status', 'inactive').order('id')
       .then(({ data }) => { if (data) setLiveCourts(data as LiveCourt[]); });
+  }, []);
+
+  useEffect(() => {
+    if (!isSupabaseEnabled || !supabase) return;
+    supabase.from('tournaments')
+      .select('id, name, date, status, max_players, court_name, start_time, end_time')
+      .in('status', ['registration', 'seeding', 'active', 'completed'])
+      .order('date', { ascending: false })
+      .limit(6)
+      .then(({ data }) => { if (data) setTournaments(data as any[]); });
   }, []);
 
   useEffect(() => {
@@ -427,6 +439,147 @@ export default function LandingPage({ onNavigate, onOpenTechModal, onOpenLogin, 
           </div>
         </div>
       </section>
+
+      {/* ── EVENTS ─────────────────────────────────────────────── */}
+      {(tournaments.length > 0 || openPlaySessions.length > 0) && (
+        <section id="events" className="py-20 px-6 bg-white">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
+              <div>
+                <span className="inline-block text-[11px] font-bold uppercase tracking-widest text-[#00694c] bg-[#bbead4]/50 px-3 py-1 rounded-full mb-3">
+                  What's On
+                </span>
+                <h2 className="text-3xl md:text-4xl font-extrabold text-[#1a1c1b] tracking-tight">Upcoming Events</h2>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+
+              {/* Open Play cards */}
+              {openPlaySessions.map(s => {
+                const isLive = s.status === 'active';
+                return (
+                  <div key={s.id} className={`group relative bg-white rounded-2xl border-2 overflow-hidden shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl
+                    ${isLive ? 'border-red-300 shadow-red-100/60' : 'border-[#e8eeeb] hover:border-[#00694c]/40'}`}>
+                    {/* top accent */}
+                    <div className={`h-1.5 w-full ${isLive ? 'bg-red-500' : 'bg-[#00694c]'}`} />
+                    <div className="p-5 space-y-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${isLive ? 'bg-red-100' : 'bg-[#e8f5ee]'}`}>
+                            <Swords className={`w-4 h-4 ${isLive ? 'text-red-500' : 'text-[#00694c]'}`} />
+                          </div>
+                          <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full
+                            ${isLive ? 'bg-red-100 text-red-600' : 'bg-[#e8f5ee] text-[#00694c]'}`}>
+                            {isLive ? '🔴 Live Now' : 'Open Play'}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-semibold text-[#6d7a73] bg-gray-50 px-2 py-0.5 rounded-lg border border-gray-100 capitalize">
+                          {s.session_type === 'round_robin' ? 'Round-Robin' : 'Rotation'}
+                        </span>
+                      </div>
+
+                      <div>
+                        <p className="font-extrabold text-[#1a1c1b] text-base leading-tight">{s.court_name}</p>
+                        <div className="flex items-center gap-3 mt-2 flex-wrap">
+                          <span className="flex items-center gap-1 text-xs text-[#6d7a73]">
+                            <Calendar className="w-3.5 h-3.5 text-[#00694c]" />{s.date}
+                          </span>
+                          <span className="flex items-center gap-1 text-xs text-[#6d7a73]">
+                            <Clock className="w-3.5 h-3.5 text-[#00694c]" />{s.start_time.slice(0,5)}–{s.end_time.slice(0,5)}
+                          </span>
+                        </div>
+                        {s.skill_filter && s.skill_filter !== 'all' && (
+                          <span className="inline-block mt-2 text-[10px] font-bold uppercase tracking-wide bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                            {s.skill_filter}
+                          </span>
+                        )}
+                      </div>
+
+                      {isLive ? (
+                        <a href="/open-play/live"
+                          className="flex items-center justify-center gap-2 w-full py-2.5 bg-red-500 hover:bg-red-600 text-white font-bold text-sm rounded-xl transition-colors">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Watch Live
+                        </a>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            if (!currentUser) { sessionStorage.setItem('open_play_return', `/open-play/register?session=${s.id}`); onOpenLogin(); }
+                            else window.location.href = `/open-play/register?session=${s.id}`;
+                          }}
+                          className="flex items-center justify-center gap-1.5 w-full py-2.5 bg-[#00694c] hover:bg-[#005a40] text-white font-bold text-sm rounded-xl transition-colors">
+                          Register Now <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Tournament cards */}
+              {tournaments.map(t => {
+                const isLive   = t.status === 'active';
+                const isDone   = t.status === 'completed';
+                const statusLabel = isLive ? '🔴 In Progress' : isDone ? '🏆 Completed' : t.status === 'seeding' ? 'Seeding' : 'Registration Open';
+                const statusColor = isLive ? 'bg-red-100 text-red-600' : isDone ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700';
+                return (
+                  <div key={t.id} className={`group relative bg-white rounded-2xl border-2 overflow-hidden shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl
+                    ${isLive ? 'border-red-300 shadow-red-100/60' : isDone ? 'border-amber-300' : 'border-[#e8eeeb] hover:border-[#00694c]/40'}`}>
+                    {/* top accent */}
+                    <div className={`h-1.5 w-full ${isLive ? 'bg-red-500' : isDone ? 'bg-amber-400' : 'bg-[#00694c]'}`} />
+                    <div className="p-5 space-y-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${isDone ? 'bg-amber-100' : 'bg-[#e8f5ee]'}`}>
+                            <Trophy className={`w-4 h-4 ${isDone ? 'text-amber-500' : 'text-[#00694c]'}`} />
+                          </div>
+                          <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${statusColor}`}>
+                            {statusLabel}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-semibold text-[#6d7a73] bg-gray-50 px-2 py-0.5 rounded-lg border border-gray-100">
+                          Double Elim
+                        </span>
+                      </div>
+
+                      <div>
+                        <p className="font-extrabold text-[#1a1c1b] text-base leading-tight">{t.name}</p>
+                        <div className="flex items-center gap-3 mt-2 flex-wrap">
+                          <span className="flex items-center gap-1 text-xs text-[#6d7a73]">
+                            <Calendar className="w-3.5 h-3.5 text-[#00694c]" />{t.date}
+                          </span>
+                          {t.court_name && (
+                            <span className="flex items-center gap-1 text-xs text-[#6d7a73]">
+                              <MapPin className="w-3.5 h-3.5 text-[#00694c]" />{t.court_name}
+                            </span>
+                          )}
+                          {t.start_time && t.end_time && (
+                            <span className="flex items-center gap-1 text-xs text-[#6d7a73]">
+                              <Clock className="w-3.5 h-3.5 text-[#00694c]" />{t.start_time.slice(0,5)}–{t.end_time.slice(0,5)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 mt-2">
+                          <Users className="w-3.5 h-3.5 text-[#6d7a73]" />
+                          <span className="text-xs text-[#6d7a73]">Up to {t.max_players} players</span>
+                        </div>
+                      </div>
+
+                      <a href={`/tournament/${t.id}`}
+                        className={`flex items-center justify-center gap-1.5 w-full py-2.5 font-bold text-sm rounded-xl transition-colors
+                          ${isDone ? 'bg-amber-400 hover:bg-amber-500 text-amber-900' : 'bg-[#00694c] hover:bg-[#005a40] text-white'}`}>
+                        {isDone ? '🏆 View Results' : isLive ? 'Watch Bracket →' : 'View Bracket →'}
+                        {!isDone && <ArrowRight className="w-3.5 h-3.5" />}
+                      </a>
+                    </div>
+                  </div>
+                );
+              })}
+
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── COURTS GRID ────────────────────────────────────────── */}
       <section id="courts" className="py-24 px-6">
