@@ -399,6 +399,153 @@ function ScoringModal({
   );
 }
 
+// ─── Rearrange Round Modal ────────────────────────────────────────────────────
+
+interface RPos { idx: number; playerId: string | null; playerName: string; }
+
+function RearrangeDraggable({ pos, isDragging }: { pos: RPos; isDragging: boolean }) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `rpos-${pos.idx}` });
+  const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined;
+  return (
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes}
+      className={`px-3 py-2 rounded-lg border-2 cursor-grab active:cursor-grabbing text-sm font-bold select-none transition-all
+        ${pos.playerId ? 'bg-white border-primary/40 text-on-surface hover:border-primary hover:shadow-sm' : 'bg-gray-50 border-dashed border-gray-300 text-gray-400 cursor-default'}
+        ${isDragging ? 'opacity-30' : ''}`}>
+      {pos.playerName || 'BYE'}
+    </div>
+  );
+}
+
+function RearrangeDroppable({ idx, children, isOver }: { idx: number; children: ReactNode; isOver: boolean }) {
+  const { setNodeRef } = useDroppable({ id: `rpos-${idx}` });
+  return (
+    <div ref={setNodeRef} className={`rounded-lg transition-all ${isOver ? 'ring-2 ring-primary ring-offset-1' : ''}`}>
+      {children}
+    </div>
+  );
+}
+
+function RearrangeRoundModal({
+  pendingMatches, players, onClose, onSave,
+}: {
+  pendingMatches: TMatch[];
+  players: TPlayer[];
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const find = (id: string | null) => players.find(p => p.id === id)?.player_name ?? (id ? '?' : 'BYE');
+  const [slots, setSlots] = useState<RPos[]>(() =>
+    pendingMatches.flatMap((m, mi) => [
+      { idx: mi * 4 + 0, playerId: m.team_a_p1, playerName: find(m.team_a_p1) },
+      { idx: mi * 4 + 1, playerId: m.team_a_p2, playerName: find(m.team_a_p2) },
+      { idx: mi * 4 + 2, playerId: m.team_b_p1, playerName: find(m.team_b_p1) },
+      { idx: mi * 4 + 3, playerId: m.team_b_p2, playerName: find(m.team_b_p2) },
+    ])
+  );
+  const [dragActiveId, setDragActiveId] = useState<string | null>(null);
+  const [overSlotId, setOverSlotId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const draggedPos = dragActiveId ? slots.find(s => `rpos-${s.idx}` === dragActiveId) : null;
+
+  const handleDragEnd = (e: DragEndEvent) => {
+    setDragActiveId(null); setOverSlotId(null);
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const fromIdx = parseInt((active.id as string).replace('rpos-', ''));
+    const toIdx = parseInt((over.id as string).replace('rpos-', ''));
+    setSlots(prev => {
+      const next = [...prev];
+      const tmp = { playerId: next[fromIdx].playerId, playerName: next[fromIdx].playerName };
+      next[fromIdx] = { ...next[fromIdx], playerId: next[toIdx].playerId, playerName: next[toIdx].playerName };
+      next[toIdx] = { ...next[toIdx], playerId: tmp.playerId, playerName: tmp.playerName };
+      return next;
+    });
+  };
+
+  const handleSave = async () => {
+    if (!supabase) return;
+    setSaving(true);
+    for (let mi = 0; mi < pendingMatches.length; mi++) {
+      await supabase.from('tournament_matches').update({
+        team_a_p1: slots[mi * 4 + 0].playerId,
+        team_a_p2: slots[mi * 4 + 1].playerId,
+        team_b_p1: slots[mi * 4 + 2].playerId,
+        team_b_p2: slots[mi * 4 + 3].playerId,
+      }).eq('id', pendingMatches[mi].id);
+    }
+    setSaving(false);
+    onSave();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
+          <div>
+            <p className="font-black text-on-surface">Rearrange Round {pendingMatches[0]?.round}</p>
+            <p className="text-xs text-outline mt-0.5">Drag players to any slot to change partnerships & matchups</p>
+          </div>
+          <button onClick={onClose}><X className="w-5 h-5 text-outline" /></button>
+        </div>
+        <div className="p-5">
+          <DndContext sensors={sensors} collisionDetection={closestCenter}
+            onDragStart={e => setDragActiveId(e.active.id as string)}
+            onDragOver={e => setOverSlotId(e.over?.id as string ?? null)}
+            onDragEnd={handleDragEnd}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {pendingMatches.map((m, mi) => (
+                <div key={m.id} className="bg-gray-50 border border-outline-variant/40 rounded-2xl p-4 space-y-3">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-outline">Match {m.match_number} · {m.bracket === 'winners' ? 'Winners' : m.bracket === 'losers' ? 'Losers' : 'Grand Final'}</span>
+                  <div className="space-y-1.5">
+                    <span className="text-[9px] text-outline font-bold">Team A</span>
+                    {[mi * 4 + 0, mi * 4 + 1].map(i => (
+                      <RearrangeDroppable key={i} idx={i} isOver={overSlotId === `rpos-${i}`}>
+                        <RearrangeDraggable pos={slots[i]} isDragging={dragActiveId === `rpos-${i}`} />
+                      </RearrangeDroppable>
+                    ))}
+                  </div>
+                  <div className="text-[9px] text-center text-outline font-black">VS</div>
+                  <div className="space-y-1.5">
+                    <span className="text-[9px] text-outline font-bold">Team B</span>
+                    {[mi * 4 + 2, mi * 4 + 3].map(i => (
+                      slots[i]?.playerId ? (
+                        <RearrangeDroppable key={i} idx={i} isOver={overSlotId === `rpos-${i}`}>
+                          <RearrangeDraggable pos={slots[i]} isDragging={dragActiveId === `rpos-${i}`} />
+                        </RearrangeDroppable>
+                      ) : (
+                        <div key={i} className="px-3 py-2 rounded-lg border-dashed border-2 border-gray-200 text-xs text-gray-400 italic">BYE</div>
+                      )
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <DragOverlay>
+              {draggedPos && (
+                <div className="px-3 py-2 rounded-lg border-2 border-primary bg-white shadow-xl text-sm font-bold text-primary cursor-grabbing">
+                  {draggedPos.playerName}
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
+          <div className="flex gap-3 mt-5">
+            <button onClick={onClose} className="flex-1 py-2.5 border border-outline-variant rounded-xl text-sm font-bold text-outline hover:bg-gray-50">
+              Cancel
+            </button>
+            <button onClick={handleSave} disabled={saving}
+              className="flex-1 py-2.5 bg-primary text-white font-black text-sm rounded-xl hover:bg-primary/90 disabled:opacity-50">
+              {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function TournamentView() {
@@ -414,8 +561,7 @@ export default function TournamentView() {
   const [activeMatchForScoring, setActiveMatchForScoring] = useState<TMatch | null>(null);
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
   const [overSlotId, setOverSlotId] = useState<string | null>(null);
-  const [swapMode, setSwapMode] = useState(false);
-  const [swapFirst, setSwapFirst] = useState<TMatch | null>(null);
+  const [showRearrange, setShowRearrange] = useState(false);
 
   const tournament = tournaments.find(t => t.id === selectedId);
 
@@ -544,32 +690,6 @@ export default function TournamentView() {
       await loadTournamentData(selectedId!);
       toast('info', 'Next round ready', `Round ${maxWBRound + 1} matches generated.`);
     }
-  };
-
-  const handleSwapClick = async (m: TMatch) => {
-    if (!swapFirst) {
-      setSwapFirst(m);
-      return;
-    }
-    if (swapFirst.id === m.id) {
-      setSwapFirst(null);
-      return;
-    }
-    // Swap team assignments between the two matches
-    const a = swapFirst;
-    const b = m;
-    await supabase?.from('tournament_matches').update({
-      team_a_p1: b.team_a_p1, team_a_p2: b.team_a_p2,
-      team_b_p1: b.team_b_p1, team_b_p2: b.team_b_p2,
-    }).eq('id', a.id);
-    await supabase?.from('tournament_matches').update({
-      team_a_p1: a.team_a_p1, team_a_p2: a.team_a_p2,
-      team_b_p1: a.team_b_p1, team_b_p2: a.team_b_p2,
-    }).eq('id', b.id);
-    setSwapFirst(null);
-    setSwapMode(false);
-    await loadTournamentData(selectedId!);
-    toast('success', 'Matchups swapped!', 'Teams reassigned.');
   };
 
   // ── Render helpers ─────────────────────────────────────────────────────────
@@ -769,22 +889,18 @@ export default function TournamentView() {
               </div>
 
               {/* Bracket toolbar */}
-              <div className="flex items-center gap-3 flex-wrap">
-                {matches.some(m => m.status === 'pending') && (
-                  <button
-                    onClick={() => { setSwapMode(s => !s); setSwapFirst(null); }}
-                    className={`flex items-center gap-1.5 text-sm font-bold border rounded-xl px-4 py-2 transition-all
-                      ${swapMode ? 'bg-amber-100 border-amber-400 text-amber-800' : 'border-outline-variant hover:bg-gray-50'}`}>
-                    ↕ {swapMode ? (swapFirst ? 'Select 2nd match…' : 'Select 1st match…') : 'Swap Matchups'}
-                  </button>
-                )}
-                {swapMode && (
-                  <button onClick={() => { setSwapMode(false); setSwapFirst(null); }}
-                    className="text-xs text-outline hover:text-on-surface font-semibold">
-                    Cancel
-                  </button>
-                )}
-              </div>
+              {(() => {
+                const maxRound = Math.max(...matches.filter(m => m.bracket !== 'grand_final').map(m => m.round), 0);
+                const pendingNow = matches.filter(m => m.status === 'pending' && m.round === maxRound && m.bracket !== 'grand_final');
+                return pendingNow.length > 0 ? (
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => setShowRearrange(true)}
+                      className="flex items-center gap-1.5 text-sm font-bold border border-outline-variant rounded-xl px-4 py-2 hover:bg-gray-50 transition-all">
+                      ↕ Rearrange Round {maxRound}
+                    </button>
+                  </div>
+                ) : null;
+              })()}
 
               {/* Bracket — MSC / TI style */}
               <BracketView
@@ -792,12 +908,8 @@ export default function TournamentView() {
                 players={players}
                 activeMatchId={activeMatchForScoring?.id ?? null}
                 onMatchClick={m => {
-                  if (swapMode) return;
                   if (m.status !== 'bye') setActiveMatchForScoring(m);
                 }}
-                swapMode={swapMode}
-                swapFirstId={swapFirst?.id ?? null}
-                onSwapClick={handleSwapClick}
               />
 
               {tournament.status === 'completed' && (() => {
@@ -840,6 +952,22 @@ export default function TournamentView() {
           onComplete={handleMatchComplete}
         />
       )}
+      {showRearrange && selectedId && (() => {
+        const maxRound = Math.max(...matches.filter(m => m.bracket !== 'grand_final').map(m => m.round), 0);
+        const pendingNow = matches.filter(m => m.status === 'pending' && m.round === maxRound && m.bracket !== 'grand_final');
+        return pendingNow.length > 0 ? (
+          <RearrangeRoundModal
+            pendingMatches={pendingNow}
+            players={players}
+            onClose={() => setShowRearrange(false)}
+            onSave={async () => {
+              setShowRearrange(false);
+              await loadTournamentData(selectedId);
+              toast('success', 'Round rearranged!', 'Player assignments updated.');
+            }}
+          />
+        ) : null;
+      })()}
     </div>
   );
 }
