@@ -108,53 +108,35 @@ function MatchBox({ match, players, isActive, onClick, editMode, onSlotClick }: 
       )}
 
       {canEdit ? (
-        /* ── Edit mode: Team A / VS / Team B with drag-and-drop chips ── */
+        /* ── Edit mode: compact Team A / VS / Team B ── */
         <div className="flex flex-col">
-          {/* Team A */}
-          <div className="px-2 pt-2 pb-1.5 bg-green-50/60">
-            <div className="flex items-center gap-1 mb-1">
-              <span className="text-[8px] font-black uppercase tracking-wider text-green-700 bg-green-200/60 px-1.5 py-0.5 rounded">A</span>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {([0, 1] as const).map(pos => {
-                const pid = pos === 0 ? match.team_a_p1 : match.team_a_p2;
-                const name = find(pid);
-                if (!name) return null;
-                const id = slotId('A', pos);
-                return (
-                  <DroppableSlot key={pos} id={id}>
-                    <DraggableChip id={id} name={name} />
-                  </DroppableSlot>
-                );
-              })}
-            </div>
+          {/* Team A row */}
+          <div className="flex items-center gap-1 px-2 py-1.5 bg-green-50/70">
+            <span className="text-[7px] font-black text-green-700 bg-green-200 px-1 py-0.5 rounded shrink-0">A</span>
+            {([0, 1] as const).map(pos => {
+              const pid = pos === 0 ? match.team_a_p1 : match.team_a_p2;
+              const name = find(pid);
+              if (!name) return null;
+              const id = slotId('A', pos);
+              return <DroppableSlot key={pos} id={id}><DraggableChip id={id} name={name} /></DroppableSlot>;
+            })}
           </div>
-
           {/* VS divider */}
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-50">
+          <div className="flex items-center gap-1 px-2 bg-white">
             <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-[8px] font-black text-gray-400 tracking-widest">VS</span>
+            <span className="text-[7px] font-black text-gray-400">VS</span>
             <div className="flex-1 h-px bg-gray-200" />
           </div>
-
-          {/* Team B */}
-          <div className="px-2 pt-1.5 pb-2 bg-blue-50/40">
-            <div className="flex items-center gap-1 mb-1">
-              <span className="text-[8px] font-black uppercase tracking-wider text-blue-700 bg-blue-200/60 px-1.5 py-0.5 rounded">B</span>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {([0, 1] as const).map(pos => {
-                const pid = pos === 0 ? match.team_b_p1 : match.team_b_p2;
-                const name = find(pid);
-                if (!name) return null;
-                const id = slotId('B', pos);
-                return (
-                  <DroppableSlot key={pos} id={id}>
-                    <DraggableChip id={id} name={name} />
-                  </DroppableSlot>
-                );
-              })}
-            </div>
+          {/* Team B row */}
+          <div className="flex items-center gap-1 px-2 py-1.5 bg-blue-50/50">
+            <span className="text-[7px] font-black text-blue-700 bg-blue-200 px-1 py-0.5 rounded shrink-0">B</span>
+            {([0, 1] as const).map(pos => {
+              const pid = pos === 0 ? match.team_b_p1 : match.team_b_p2;
+              const name = find(pid);
+              if (!name) return null;
+              const id = slotId('B', pos);
+              return <DroppableSlot key={pos} id={id}><DraggableChip id={id} name={name} /></DroppableSlot>;
+            })}
           </div>
         </div>
       ) : (
