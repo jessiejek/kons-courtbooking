@@ -414,6 +414,8 @@ export default function TournamentView() {
   const [activeMatchForScoring, setActiveMatchForScoring] = useState<TMatch | null>(null);
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
   const [overSlotId, setOverSlotId] = useState<string | null>(null);
+  const [swapMode, setSwapMode] = useState(false);
+  const [swapFirst, setSwapFirst] = useState<TMatch | null>(null);
 
   const tournament = tournaments.find(t => t.id === selectedId);
 
@@ -542,6 +544,30 @@ export default function TournamentView() {
       await loadTournamentData(selectedId!);
       toast('info', 'Next round ready', `Round ${maxWBRound + 1} matches generated.`);
     }
+  };
+
+  const handleSwapClick = async (clicked: TMatch) => {
+    if (clicked.status !== 'pending') return;
+    if (!swapFirst) { setSwapFirst(clicked); return; }
+    if (swapFirst.id === clicked.id) { setSwapFirst(null); return; }
+    if (swapFirst.bracket !== clicked.bracket) {
+      toast('warning', 'Same bracket only', 'Can only swap within the same bracket.');
+      return;
+    }
+    const a = swapFirst, b = clicked;
+    await Promise.all([
+      supabase?.from('tournament_matches').update({
+        team_a_p1: b.team_a_p1, team_a_p2: b.team_a_p2,
+        team_b_p1: b.team_b_p1, team_b_p2: b.team_b_p2,
+      }).eq('id', a.id),
+      supabase?.from('tournament_matches').update({
+        team_a_p1: a.team_a_p1, team_a_p2: a.team_a_p2,
+        team_b_p1: a.team_b_p1, team_b_p2: a.team_b_p2,
+      }).eq('id', b.id),
+    ]);
+    setSwapFirst(null);
+    await loadTournamentData(selectedId!);
+    toast('success', 'Swapped!', 'Match pairings updated.');
   };
 
   // â”€â”€ Render helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -793,3 +819,4 @@ export default function TournamentView() {
     </div>
   );
 }
+

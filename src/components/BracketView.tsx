@@ -25,10 +25,13 @@ interface MatchBoxProps {
   match: TMatch;
   players: TPlayer[];
   isActive?: boolean;
+  isSwapSelected?: boolean;
+  isSwapTarget?: boolean;
+  isSwapable?: boolean;
   onClick?: () => void;
 }
 
-function MatchBox({ match, players, isActive, onClick }: MatchBoxProps) {
+function MatchBox({ match, players, isActive, isSwapSelected, isSwapTarget, isSwapable, onClick }: MatchBoxProps) {
   const teamA = getTeamName(match, 'A', players);
   const teamB = getTeamName(match, 'B', players);
   const isBye  = match.status === 'bye';
@@ -43,14 +46,27 @@ function MatchBox({ match, players, isActive, onClick }: MatchBoxProps) {
       className={`rounded-xl border-2 overflow-hidden flex flex-col transition-all select-none
         ${isLive  ? 'border-red-400 shadow-lg shadow-red-100/60 cursor-pointer' : ''}
         ${isDone  ? 'border-gray-200' : ''}
-        ${isPending && !isBye ? 'border-outline-variant/40 hover:border-primary/60 cursor-pointer' : ''}
+        ${isPending && !isBye && !isSwapable ? 'border-outline-variant/40 hover:border-primary/60 cursor-pointer' : ''}
         ${isBye   ? 'border-dashed border-gray-200 opacity-60' : ''}
         ${isActive ? 'ring-2 ring-primary ring-offset-1' : ''}
+        ${isSwapSelected ? 'border-amber-400 ring-2 ring-amber-300 ring-offset-1 shadow-amber-100 shadow-lg cursor-pointer' : ''}
+        ${isSwapTarget ? 'border-blue-400 ring-2 ring-blue-300 ring-offset-1 cursor-pointer animate-pulse' : ''}
+        ${isSwapable && !isSwapSelected && !isSwapTarget ? 'border-amber-200 hover:border-amber-400 cursor-pointer' : ''}
       `}
     >
       {isLive && (
         <div className="bg-red-500 text-white text-[7px] font-black uppercase tracking-widest text-center shrink-0 flex items-center justify-center gap-1 py-[2px]">
           <span className="w-1 h-1 rounded-full bg-white animate-pulse" />LIVE
+        </div>
+      )}
+      {isSwapSelected && (
+        <div className="bg-amber-400 text-amber-900 text-[7px] font-black uppercase tracking-widest text-center shrink-0 py-[2px]">
+          ↕ SELECTED — click another to swap
+        </div>
+      )}
+      {isSwapTarget && (
+        <div className="bg-blue-400 text-white text-[7px] font-black uppercase tracking-widest text-center shrink-0 py-[2px]">
+          ↕ CLICK TO SWAP HERE
         </div>
       )}
       {/* Team A row */}
@@ -224,10 +240,14 @@ interface SectionProps {
   players: TPlayer[];
   onMatchClick?: (m: TMatch) => void;
   activeMatchId?: string | null;
+  swapMode?: boolean;
+  swapFirstId?: string | null;
+  onSwapClick?: (m: TMatch) => void;
 }
 
 function BracketSection({
   label, labelIcon, accentColor, rounds, roundLabels, players, onMatchClick, activeMatchId,
+  swapMode, swapFirstId, onSwapClick,
 }: SectionProps) {
   const r1Count = rounds[0]?.length ?? 0;
   if (r1Count === 0) return null;
@@ -282,8 +302,13 @@ function BracketSection({
                         match={match}
                         players={players}
                         isActive={activeMatchId === match.id}
+                        isSwapSelected={swapFirstId === match.id}
+                        isSwapTarget={swapMode && match.status === 'pending' && swapFirstId !== match.id && !!swapFirstId}
+                        isSwapable={swapMode && match.status === 'pending'}
                         onClick={
-                          onMatchClick && match.status !== 'bye'
+                          swapMode && match.status === 'pending' && onSwapClick
+                            ? () => onSwapClick(match)
+                            : onMatchClick && match.status !== 'bye'
                             ? () => onMatchClick(match)
                             : undefined
                         }
@@ -307,9 +332,12 @@ export interface BracketViewProps {
   players: TPlayer[];
   onMatchClick?: (m: TMatch) => void;
   activeMatchId?: string | null;
+  swapMode?: boolean;
+  swapFirstId?: string | null;
+  onSwapClick?: (m: TMatch) => void;
 }
 
-export default function BracketView({ matches, players, onMatchClick, activeMatchId }: BracketViewProps) {
+export default function BracketView({ matches, players, onMatchClick, activeMatchId, swapMode, swapFirstId, onSwapClick }: BracketViewProps) {
   // Separate brackets
   const wbMatches = matches.filter(m => m.bracket === 'winners');
   const lbMatches = matches.filter(m => m.bracket === 'losers');
@@ -352,6 +380,9 @@ export default function BracketView({ matches, players, onMatchClick, activeMatc
           players={players}
           onMatchClick={onMatchClick}
           activeMatchId={activeMatchId}
+          swapMode={swapMode}
+          swapFirstId={swapFirstId}
+          onSwapClick={onSwapClick}
         />
       )}
 
@@ -368,6 +399,9 @@ export default function BracketView({ matches, players, onMatchClick, activeMatc
           players={players}
           onMatchClick={onMatchClick}
           activeMatchId={activeMatchId}
+          swapMode={swapMode}
+          swapFirstId={swapFirstId}
+          onSwapClick={onSwapClick}
         />
       )}
 
