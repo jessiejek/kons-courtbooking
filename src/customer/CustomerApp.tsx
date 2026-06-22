@@ -11,6 +11,7 @@ import BookingDetailPage from './components/BookingDetailPage';
 import TechnologyModal from './components/TechnologyModal';
 import OpenPlayLive from './components/OpenPlayLive';
 import OpenPlayRegister from './components/OpenPlayRegister';
+import TournamentLive from './components/TournamentLive';
 import LoginModal from '../LoginModal';
 import { CurrentUser } from '../App';
 import { supabase, isSupabaseEnabled } from '../lib/supabase';
@@ -148,6 +149,7 @@ export default function CustomerApp({ role, onLogin, onLogout, currentUser }: Pr
         } />
 
         <Route path="/open-play/live" element={<OpenPlayLive />} />
+        <Route path="/tournament/:id" element={<TournamentLive />} />
         <Route path="/open-play/register" element={
           <OpenPlayRegister
             currentUser={currentUser}
