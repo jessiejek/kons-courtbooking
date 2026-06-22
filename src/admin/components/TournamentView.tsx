@@ -670,6 +670,8 @@ export default function TournamentView() {
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
   const [overSlotId, setOverSlotId] = useState<string | null>(null);
   const [showRearrange, setShowRearrange] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<import('../../components/BracketView').PlayerSlot | null>(null);
 
   const tournament = tournaments.find(t => t.id === selectedId);
 
@@ -1026,14 +1028,23 @@ export default function TournamentView() {
 
               {/* Bracket toolbar */}
               {(() => {
-                const maxRound = Math.max(...matches.filter(m => m.bracket !== 'grand_final').map(m => m.round), 0);
-                const pendingNow = matches.filter(m => m.status === 'pending' && m.round === maxRound && m.bracket !== 'grand_final');
-                return pendingNow.length > 0 ? (
+                const hasPending = matches.some(m => m.status === 'pending');
+                return hasPending ? (
                   <div className="flex items-center gap-3">
-                    <button onClick={() => setShowRearrange(true)}
-                      className="flex items-center gap-1.5 text-sm font-bold border border-outline-variant rounded-xl px-4 py-2 hover:bg-gray-50 transition-all">
-                      ↕ Rearrange Round {maxRound}
+                    <button
+                      onClick={() => { setEditMode(e => !e); setSelectedSlot(null); }}
+                      className={`flex items-center gap-1.5 text-sm font-bold border rounded-xl px-4 py-2 transition-all
+                        ${editMode ? 'bg-amber-100 border-amber-400 text-amber-800' : 'border-outline-variant hover:bg-gray-50'}`}>
+                      ✎ {editMode ? 'Done Editing' : 'Edit Players'}
                     </button>
+                    {editMode && selectedSlot && (
+                      <span className="text-xs text-amber-700 font-semibold animate-pulse">
+                        Tap another player to swap with <strong>{players.find(p => p.id === selectedSlot.playerId)?.player_name}</strong>
+                      </span>
+                    )}
+                    {editMode && !selectedSlot && (
+                      <span className="text-xs text-outline font-semibold">Tap any player to move them</span>
+                    )}
                   </div>
                 ) : null;
               })()}
@@ -1044,7 +1055,36 @@ export default function TournamentView() {
                 players={players}
                 activeMatchId={activeMatchForScoring?.id ?? null}
                 onMatchClick={m => {
-                  if (m.status !== 'bye') setActiveMatchForScoring(m);
+                  if (!editMode && m.status !== 'bye') setActiveMatchForScoring(m);
+                }}
+                editMode={editMode}
+                selectedSlot={selectedSlot}
+                onSlotClick={async (slot) => {
+                  if (!selectedSlot) {
+                    setSelectedSlot(slot);
+                    return;
+                  }
+                  if (selectedSlot.matchId === slot.matchId && selectedSlot.team === slot.team && selectedSlot.pos === slot.pos) {
+                    setSelectedSlot(null);
+                    return;
+                  }
+                  // Swap the two player IDs in DB
+                  const getField = (team: 'A'|'B', pos: 0|1) =>
+                    team === 'A' ? (pos === 0 ? 'team_a_p1' : 'team_a_p2') : (pos === 0 ? 'team_b_p1' : 'team_b_p2');
+                  const a = selectedSlot, b = slot;
+                  // Build two patch objects: swap a.playerId into b's field, b.playerId into a's field
+                  if (a.matchId === b.matchId) {
+                    // Same match — one update
+                    await supabase?.from('tournament_matches').update({
+                      [getField(a.team, a.pos)]: b.playerId,
+                      [getField(b.team, b.pos)]: a.playerId,
+                    }).eq('id', a.matchId);
+                  } else {
+                    await supabase?.from('tournament_matches').update({ [getField(a.team, a.pos)]: b.playerId }).eq('id', a.matchId);
+                    await supabase?.from('tournament_matches').update({ [getField(b.team, b.pos)]: a.playerId }).eq('id', b.matchId);
+                  }
+                  setSelectedSlot(null);
+                  await loadTournamentData(selectedId!);
                 }}
               />
 

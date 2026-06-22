@@ -19,39 +19,63 @@ const SLOT_H  = MATCH_H + 20; // 100px — vertical slot per R1 match (includes 
 const CONN_X  = 20;  // px — horizontal distance from match right to vertical connector line
 const COL_GAP = 48;  // px — full horizontal gap between columns (connector lives inside this)
 
+// ─── Slot key helper ─────────────────────────────────────────────────────────
+
+export interface PlayerSlot { matchId: string; team: 'A' | 'B'; pos: 0 | 1; playerId: string | null; }
+
 // ─── Match box ────────────────────────────────────────────────────────────────
 
 interface MatchBoxProps {
   match: TMatch;
   players: TPlayer[];
   isActive?: boolean;
-  isSwapSelected?: boolean;
-  isSwapTarget?: boolean;
-  isSwapable?: boolean;
   onClick?: () => void;
+  // inline edit
+  editMode?: boolean;
+  selectedSlot?: PlayerSlot | null;
+  onSlotClick?: (slot: PlayerSlot) => void;
 }
 
-function MatchBox({ match, players, isActive, isSwapSelected, isSwapTarget, isSwapable, onClick }: MatchBoxProps) {
-  const teamA = getTeamName(match, 'A', players);
-  const teamB = getTeamName(match, 'B', players);
-  const isBye  = match.status === 'bye';
-  const isDone = match.status === 'completed';
-  const isLive = match.status === 'active';
+function MatchBox({ match, players, isActive, onClick, editMode, selectedSlot, onSlotClick }: MatchBoxProps) {
+  const find = (id: string | null) => players.find(p => p.id === id)?.player_name ?? (id ? '?' : null);
+  const isBye     = match.status === 'bye';
+  const isDone    = match.status === 'completed';
+  const isLive    = match.status === 'active';
   const isPending = match.status === 'pending';
+  const canEdit   = editMode && isPending;
+
+  const teamAStr = `${find(match.team_a_p1) ?? '?'} & ${find(match.team_a_p2) ?? '?'}`;
+  const teamBStr = `${find(match.team_b_p1) ?? '?'} & ${find(match.team_b_p2) ?? '?'}`;
+
+  const isSelected = (team: 'A' | 'B', pos: 0 | 1) =>
+    selectedSlot?.matchId === match.id && selectedSlot?.team === team && selectedSlot?.pos === pos;
+  const isTarget = (team: 'A' | 'B', pos: 0 | 1) =>
+    canEdit && selectedSlot !== null && selectedSlot !== undefined &&
+    !(selectedSlot.matchId === match.id && selectedSlot.team === team && selectedSlot.pos === pos);
+
+  const slotClick = (team: 'A' | 'B', pos: 0 | 1, playerId: string | null) => {
+    if (!canEdit || !onSlotClick) return;
+    onSlotClick({ matchId: match.id, team, pos, playerId });
+  };
+
+  const slots: { team: 'A'|'B'; pos: 0|1; id: string|null }[] = [
+    { team: 'A', pos: 0, id: match.team_a_p1 },
+    { team: 'A', pos: 1, id: match.team_a_p2 },
+    { team: 'B', pos: 0, id: match.team_b_p1 },
+    { team: 'B', pos: 1, id: match.team_b_p2 },
+  ];
 
   return (
     <div
-      onClick={onClick}
-      style={{ width: MATCH_W, height: MATCH_H }}
+      onClick={!canEdit ? onClick : undefined}
+      style={{ width: MATCH_W, minHeight: canEdit ? 'auto' : MATCH_H }}
       className={`rounded-xl border-2 overflow-hidden flex flex-col transition-all select-none
-        ${isLive  ? 'border-red-400 shadow-lg shadow-red-100/60 cursor-pointer' : ''}
-        ${isDone  ? 'border-gray-200' : ''}
-        ${isPending && !isBye && !isSwapable ? 'border-outline-variant/40 hover:border-primary/60 cursor-pointer' : ''}
-        ${isBye   ? 'border-dashed border-gray-200 opacity-60' : ''}
-        ${isActive ? 'ring-2 ring-primary ring-offset-1' : ''}
-        ${isSwapSelected ? 'border-amber-400 ring-2 ring-amber-300 ring-offset-1 shadow-amber-100 shadow-lg cursor-pointer' : ''}
-        ${isSwapTarget ? 'border-blue-400 ring-2 ring-blue-300 ring-offset-1 cursor-pointer animate-pulse' : ''}
-        ${isSwapable && !isSwapSelected && !isSwapTarget ? 'border-amber-200 hover:border-amber-400 cursor-pointer' : ''}
+        ${isLive    ? 'border-red-400 shadow-lg shadow-red-100/60 cursor-pointer' : ''}
+        ${isDone    ? 'border-gray-200' : ''}
+        ${isPending && !isBye && !canEdit ? 'border-outline-variant/40 hover:border-primary/60 cursor-pointer' : ''}
+        ${isBye     ? 'border-dashed border-gray-200 opacity-60' : ''}
+        ${isActive  ? 'ring-2 ring-primary ring-offset-1' : ''}
+        ${canEdit   ? 'border-amber-300 shadow-amber-100/60 shadow-md' : ''}
       `}
     >
       {isLive && (
@@ -59,61 +83,88 @@ function MatchBox({ match, players, isActive, isSwapSelected, isSwapTarget, isSw
           <span className="w-1 h-1 rounded-full bg-white animate-pulse" />LIVE
         </div>
       )}
-      {isSwapSelected && (
-        <div className="bg-amber-400 text-amber-900 text-[7px] font-black uppercase tracking-widest text-center shrink-0 py-[2px]">
-          ↕ SELECTED — click another to swap
+      {canEdit && (
+        <div className="bg-amber-400/20 text-amber-700 text-[7px] font-black uppercase tracking-widest text-center shrink-0 py-[2px]">
+          ✎ tap player to move
         </div>
       )}
-      {isSwapTarget && (
-        <div className="bg-blue-400 text-white text-[7px] font-black uppercase tracking-widest text-center shrink-0 py-[2px]">
-          ↕ CLICK TO SWAP HERE
-        </div>
-      )}
-      {/* Team A row */}
-      <div className={`flex-1 px-3 flex items-center justify-between gap-2
-        ${match.winner_team === 'A' ? 'bg-green-50' : 'bg-white'}
-        ${match.winner_team === 'B' ? 'opacity-40' : ''}
-      `}>
-        <div className="flex items-center gap-1 min-w-0">
-          {match.winner_team === 'A' && <Trophy className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
-          <span className={`text-[11px] font-bold truncate leading-tight
-            ${match.winner_team === 'A' ? 'text-primary' : 'text-slate-700'}`}>
-            {teamA}
-          </span>
-        </div>
-        {(isLive || isDone) && (
-          <span className={`text-sm font-black shrink-0 tabular-nums
-            ${match.winner_team === 'A' ? 'text-primary' : isLive ? 'text-red-500' : 'text-gray-400'}`}>
-            {match.score_a}
-          </span>
-        )}
-      </div>
-      {/* Divider */}
-      <div className="h-px shrink-0 bg-gray-100" />
-      {/* Team B row */}
-      {isBye ? (
-        <div className="flex-1 px-3 flex items-center bg-gray-50">
-          <span className="text-[10px] text-gray-400 italic">BYE — auto advance</span>
-        </div>
-      ) : (
-        <div className={`flex-1 px-3 flex items-center justify-between gap-2
-          ${match.winner_team === 'B' ? 'bg-green-50' : 'bg-white'}
-          ${match.winner_team === 'A' ? 'opacity-40' : ''}
-        `}>
-          <div className="flex items-center gap-1 min-w-0">
-            {match.winner_team === 'B' && <Trophy className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
-            <span className={`text-[11px] font-bold truncate leading-tight
-              ${match.winner_team === 'B' ? 'text-primary' : 'text-slate-700'}`}>
-              {teamB}
-            </span>
-          </div>
-          {(isLive || isDone) && (
-            <span className={`text-sm font-black shrink-0 tabular-nums
-              ${match.winner_team === 'B' ? 'text-primary' : isLive ? 'text-red-500' : 'text-gray-400'}`}>
-              {match.score_b}
-            </span>
+
+      {canEdit ? (
+        /* ── Edit mode: show 4 individual clickable player chips ── */
+        <div className="flex flex-col divide-y divide-gray-100">
+          {(['A', 'B'] as const).map((team) => (
+            <div key={team} className={`flex items-center gap-1 px-2 py-1.5 ${match.winner_team && match.winner_team !== team ? 'opacity-40' : ''} ${match.winner_team === team ? 'bg-green-50' : ''}`}>
+              {match.winner_team === team && <Trophy className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
+              <div className="flex flex-wrap gap-1 flex-1 min-w-0">
+                {([0, 1] as const).map(pos => {
+                  const pid = team === 'A' ? (pos === 0 ? match.team_a_p1 : match.team_a_p2) : (pos === 0 ? match.team_b_p1 : match.team_b_p2);
+                  const name = find(pid);
+                  if (!name) return null;
+                  const sel = isSelected(team, pos);
+                  const tgt = isTarget(team, pos);
+                  return (
+                    <button
+                      key={pos}
+                      onClick={() => slotClick(team, pos, pid)}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-all
+                        ${sel ? 'bg-amber-400 text-amber-900 border-amber-500 shadow-md scale-105' :
+                          tgt ? 'bg-blue-100 text-blue-700 border-blue-400 animate-pulse cursor-pointer' :
+                                'bg-white text-slate-700 border-gray-200 hover:border-amber-400 hover:bg-amber-50 cursor-pointer'}`}
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+              {(isLive || isDone) && (
+                <span className={`text-sm font-black shrink-0 tabular-nums ml-1
+                  ${match.winner_team === team ? 'text-primary' : isLive ? 'text-red-500' : 'text-gray-400'}`}>
+                  {team === 'A' ? match.score_a : match.score_b}
+                </span>
+              )}
+            </div>
+          ))}
+          {isBye && (
+            <div className="px-3 py-2 bg-gray-50">
+              <span className="text-[10px] text-gray-400 italic">BYE — auto advance</span>
+            </div>
           )}
         </div>
+      ) : (
+        /* ── Normal mode: original team-name rows ── */
+        <>
+          <div className={`flex-1 px-3 flex items-center justify-between gap-2
+            ${match.winner_team === 'A' ? 'bg-green-50' : 'bg-white'}
+            ${match.winner_team === 'B' ? 'opacity-40' : ''}`}
+            style={{ minHeight: MATCH_H / 2 }}>
+            <div className="flex items-center gap-1 min-w-0">
+              {match.winner_team === 'A' && <Trophy className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
+              <span className={`text-[11px] font-bold truncate leading-tight ${match.winner_team === 'A' ? 'text-primary' : 'text-slate-700'}`}>{teamAStr}</span>
+            </div>
+            {(isLive || isDone) && (
+              <span className={`text-sm font-black shrink-0 tabular-nums ${match.winner_team === 'A' ? 'text-primary' : isLive ? 'text-red-500' : 'text-gray-400'}`}>{match.score_a}</span>
+            )}
+          </div>
+          <div className="h-px shrink-0 bg-gray-100" />
+          {isBye ? (
+            <div className="flex-1 px-3 flex items-center bg-gray-50" style={{ minHeight: MATCH_H / 2 }}>
+              <span className="text-[10px] text-gray-400 italic">BYE — auto advance</span>
+            </div>
+          ) : (
+            <div className={`flex-1 px-3 flex items-center justify-between gap-2
+              ${match.winner_team === 'B' ? 'bg-green-50' : 'bg-white'}
+              ${match.winner_team === 'A' ? 'opacity-40' : ''}`}
+              style={{ minHeight: MATCH_H / 2 }}>
+              <div className="flex items-center gap-1 min-w-0">
+                {match.winner_team === 'B' && <Trophy className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
+                <span className={`text-[11px] font-bold truncate leading-tight ${match.winner_team === 'B' ? 'text-primary' : 'text-slate-700'}`}>{teamBStr}</span>
+              </div>
+              {(isLive || isDone) && (
+                <span className={`text-sm font-black shrink-0 tabular-nums ${match.winner_team === 'B' ? 'text-primary' : isLive ? 'text-red-500' : 'text-gray-400'}`}>{match.score_b}</span>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -240,14 +291,14 @@ interface SectionProps {
   players: TPlayer[];
   onMatchClick?: (m: TMatch) => void;
   activeMatchId?: string | null;
-  swapMode?: boolean;
-  swapFirstId?: string | null;
-  onSwapClick?: (m: TMatch) => void;
+  editMode?: boolean;
+  selectedSlot?: PlayerSlot | null;
+  onSlotClick?: (slot: PlayerSlot) => void;
 }
 
 function BracketSection({
   label, labelIcon, accentColor, rounds, roundLabels, players, onMatchClick, activeMatchId,
-  swapMode, swapFirstId, onSwapClick,
+  editMode, selectedSlot, onSlotClick,
 }: SectionProps) {
   const r1Count = rounds[0]?.length ?? 0;
   if (r1Count === 0) return null;
@@ -302,16 +353,10 @@ function BracketSection({
                         match={match}
                         players={players}
                         isActive={activeMatchId === match.id}
-                        isSwapSelected={swapFirstId === match.id}
-                        isSwapTarget={swapMode && match.status === 'pending' && swapFirstId !== match.id && !!swapFirstId}
-                        isSwapable={swapMode && match.status === 'pending'}
-                        onClick={
-                          swapMode && match.status === 'pending' && onSwapClick
-                            ? () => onSwapClick(match)
-                            : onMatchClick && match.status !== 'bye'
-                            ? () => onMatchClick(match)
-                            : undefined
-                        }
+                        editMode={editMode}
+                        selectedSlot={selectedSlot}
+                        onSlotClick={onSlotClick}
+                        onClick={onMatchClick && match.status !== 'bye' ? () => onMatchClick(match) : undefined}
                       />
                     </div>
                   );
@@ -332,12 +377,12 @@ export interface BracketViewProps {
   players: TPlayer[];
   onMatchClick?: (m: TMatch) => void;
   activeMatchId?: string | null;
-  swapMode?: boolean;
-  swapFirstId?: string | null;
-  onSwapClick?: (m: TMatch) => void;
+  editMode?: boolean;
+  selectedSlot?: PlayerSlot | null;
+  onSlotClick?: (slot: PlayerSlot) => void;
 }
 
-export default function BracketView({ matches, players, onMatchClick, activeMatchId, swapMode, swapFirstId, onSwapClick }: BracketViewProps) {
+export default function BracketView({ matches, players, onMatchClick, activeMatchId, editMode, selectedSlot, onSlotClick }: BracketViewProps) {
   // Separate brackets
   const wbMatches = matches.filter(m => m.bracket === 'winners');
   const lbMatches = matches.filter(m => m.bracket === 'losers');
@@ -380,9 +425,9 @@ export default function BracketView({ matches, players, onMatchClick, activeMatc
           players={players}
           onMatchClick={onMatchClick}
           activeMatchId={activeMatchId}
-          swapMode={swapMode}
-          swapFirstId={swapFirstId}
-          onSwapClick={onSwapClick}
+          editMode={editMode}
+          selectedSlot={selectedSlot}
+          onSlotClick={onSlotClick}
         />
       )}
 
@@ -399,9 +444,9 @@ export default function BracketView({ matches, players, onMatchClick, activeMatc
           players={players}
           onMatchClick={onMatchClick}
           activeMatchId={activeMatchId}
-          swapMode={swapMode}
-          swapFirstId={swapFirstId}
-          onSwapClick={onSwapClick}
+          editMode={editMode}
+          selectedSlot={selectedSlot}
+          onSlotClick={onSlotClick}
         />
       )}
 
