@@ -25,6 +25,17 @@ interface Tournament {
   max_players: number;
   skill_filter: string;
   shuffle_every_round: boolean;
+  court_id: number | null;
+  court_name: string | null;
+  start_time: string | null;
+  end_time: string | null;
+}
+
+interface Court {
+  id: number;
+  name: string;
+  slug: string;
+  status: string;
 }
 
 interface OPGame {
@@ -81,23 +92,73 @@ function CreateTournamentModal({ onClose, onCreate }: { onClose: () => void; onC
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [maxPlayers, setMaxPlayers] = useState(12);
   const [shuffleEveryRound, setShuffleEveryRound] = useState(false);
+  const [courts, setCourts] = useState<Court[]>([]);
+  const [courtId, setCourtId] = useState<number | null>(null);
+  const [startTime, setStartTime] = useState('08:00');
+  const [endTime, setEndTime] = useState('12:00');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.from('courts').select('id, name, slug, status').eq('status', 'active').order('name')
+      .then(({ data }) => { if (data) setCourts(data as Court[]); });
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!supabase) return;
     setSaving(true);
+
+    const selectedCourt = courts.find(c => c.id === courtId);
+
     const { data, error } = await supabase.from('tournaments').insert({
       name, date, max_players: maxPlayers, status: 'registration', skill_filter: 'all',
       shuffle_every_round: shuffleEveryRound,
+      court_id: courtId ?? null,
+      court_name: selectedCourt?.name ?? null,
+      start_time: courtId ? startTime : null,
+      end_time: courtId ? endTime : null,
     }).select().single();
-    if (!error && data) onCreate(data as Tournament);
+
+    if (error || !data) { setSaving(false); return; }
+
+    // Block the court for the tournament hours
+    if (courtId && selectedCourt) {
+      const bookingRef = `TRN-${Math.floor(1000 + Math.random() * 9000)}`;
+      const { data: bk } = await supabase.from('bookings').insert({
+        booking_ref: bookingRef,
+        booking_date: date,
+        start_time: startTime,
+        end_time: endTime,
+        court_id: courtId,
+        court_name: selectedCourt.name,
+        customer_name: `[Tournament] ${name}`,
+        customer_phone: '',
+        booking_status: 'confirmed',
+        payment_method: 'cash',
+        payment_status: 'paid',
+        total_amount: 0,
+      }).select().single();
+
+      if (bk) {
+        // Insert one slot row per hour to block availability
+        const slots: { booking_id: string; court_id: number; slot_date: string; slot_time: string }[] = [];
+        const [sh, sm] = startTime.split(':').map(Number);
+        const [eh] = endTime.split(':').map(Number);
+        for (let h = sh; h < eh; h++) {
+          slots.push({ booking_id: bk.id, court_id: courtId, slot_date: date, slot_time: `${String(h).padStart(2,'0')}:${String(sm).padStart(2,'0')}` });
+        }
+        if (slots.length > 0) await supabase.from('booking_slots').insert(slots);
+      }
+    }
+
+    onCreate(data as Tournament);
     setSaving(false);
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 my-4">
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-lg font-black text-on-surface">New Tournament</h3>
           <button onClick={onClose}><X className="w-5 h-5 text-outline" /></button>
@@ -126,6 +187,34 @@ function CreateTournamentModal({ onClose, onCreate }: { onClose: () => void; onC
               ))}
             </div>
           </div>
+
+          {/* Court + Hours */}
+          <div>
+            <label className="text-xs font-bold text-outline uppercase tracking-wide block mb-1">Court (optional)</label>
+            <select value={courtId ?? ''} onChange={e => setCourtId(e.target.value ? Number(e.target.value) : null)}
+              className="w-full border border-outline-variant rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white">
+              <option value="">— No court selected —</option>
+              {courts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            {courtId && (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-outline uppercase tracking-wide block mb-1">Start Time</label>
+                  <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)}
+                    className="w-full border border-outline-variant rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-outline uppercase tracking-wide block mb-1">End Time</label>
+                  <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)}
+                    className="w-full border border-outline-variant rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                </div>
+              </div>
+            )}
+            {courtId && (
+              <p className="text-[10px] text-outline mt-1.5">Court will be blocked from booking during these hours.</p>
+            )}
+          </div>
+
           <div>
             <label className="text-xs font-bold text-outline uppercase tracking-wide block mb-2">Partnerships</label>
             <div className="flex flex-col gap-2">
