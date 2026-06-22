@@ -671,7 +671,6 @@ export default function TournamentView() {
   const [overSlotId, setOverSlotId] = useState<string | null>(null);
   const [showRearrange, setShowRearrange] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState<import('../../components/BracketView').PlayerSlot | null>(null);
 
   const tournament = tournaments.find(t => t.id === selectedId);
 
@@ -1032,18 +1031,13 @@ export default function TournamentView() {
                 return hasPending ? (
                   <div className="flex items-center gap-3">
                     <button
-                      onClick={() => { setEditMode(e => !e); setSelectedSlot(null); }}
+                      onClick={() => setEditMode(e => !e)}
                       className={`flex items-center gap-1.5 text-sm font-bold border rounded-xl px-4 py-2 transition-all
                         ${editMode ? 'bg-amber-100 border-amber-400 text-amber-800' : 'border-outline-variant hover:bg-gray-50'}`}>
                       ✎ {editMode ? 'Done Editing' : 'Edit Players'}
                     </button>
-                    {editMode && selectedSlot && (
-                      <span className="text-xs text-amber-700 font-semibold animate-pulse">
-                        Tap another player to swap with <strong>{players.find(p => p.id === selectedSlot.playerId)?.player_name}</strong>
-                      </span>
-                    )}
-                    {editMode && !selectedSlot && (
-                      <span className="text-xs text-outline font-semibold">Tap any player to move them</span>
+                    {editMode && (
+                      <span className="text-xs text-outline font-semibold">Drag a player chip onto another to swap</span>
                     )}
                   </div>
                 ) : null;
@@ -1058,23 +1052,10 @@ export default function TournamentView() {
                   if (!editMode && m.status !== 'bye') setActiveMatchForScoring(m);
                 }}
                 editMode={editMode}
-                selectedSlot={selectedSlot}
-                onSlotClick={async (slot) => {
-                  if (!selectedSlot) {
-                    setSelectedSlot(slot);
-                    return;
-                  }
-                  if (selectedSlot.matchId === slot.matchId && selectedSlot.team === slot.team && selectedSlot.pos === slot.pos) {
-                    setSelectedSlot(null);
-                    return;
-                  }
-                  // Swap the two player IDs in DB
+                onSlotSwap={async (a, b) => {
                   const getField = (team: 'A'|'B', pos: 0|1) =>
                     team === 'A' ? (pos === 0 ? 'team_a_p1' : 'team_a_p2') : (pos === 0 ? 'team_b_p1' : 'team_b_p2');
-                  const a = selectedSlot, b = slot;
-                  // Build two patch objects: swap a.playerId into b's field, b.playerId into a's field
                   if (a.matchId === b.matchId) {
-                    // Same match — one update
                     await supabase?.from('tournament_matches').update({
                       [getField(a.team, a.pos)]: b.playerId,
                       [getField(b.team, b.pos)]: a.playerId,
@@ -1083,7 +1064,6 @@ export default function TournamentView() {
                     await supabase?.from('tournament_matches').update({ [getField(a.team, a.pos)]: b.playerId }).eq('id', a.matchId);
                     await supabase?.from('tournament_matches').update({ [getField(b.team, b.pos)]: a.playerId }).eq('id', b.matchId);
                   }
-                  setSelectedSlot(null);
                   await loadTournamentData(selectedId!);
                 }}
               />

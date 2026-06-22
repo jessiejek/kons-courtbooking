@@ -8,6 +8,9 @@
 
 import React, { type ReactNode } from 'react';
 import { Trophy } from 'lucide-react';
+import { DndContext, DragOverlay, useDraggable, useDroppable } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 import { getTeamName } from '../lib/tournamentBracket';
 import type { TMatch, TPlayer } from '../lib/tournamentBracket';
 
@@ -23,6 +26,38 @@ const COL_GAP = 48;  // px — full horizontal gap between columns (connector li
 
 export interface PlayerSlot { matchId: string; team: 'A' | 'B'; pos: 0 | 1; playerId: string | null; }
 
+// ─── Drag-and-drop chip sub-components ───────────────────────────────────────
+
+function DraggableChip({ id, name, isOver }: { id: string; name: string; isOver?: boolean }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id });
+  const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined;
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className={`text-[10px] font-bold px-2 py-1 rounded-lg border cursor-grab active:cursor-grabbing transition-all z-10 relative touch-none
+        ${isDragging  ? 'opacity-40 scale-95 border-amber-300 bg-amber-50'  :
+          isOver      ? 'ring-2 ring-amber-400 bg-amber-50 border-amber-400' :
+                        'bg-white text-slate-700 border-gray-300 hover:border-amber-400 hover:bg-amber-50'}`}
+    >
+      {name}
+    </div>
+  );
+}
+
+function DroppableSlot({ id, children }: { id: string; children: ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div ref={setNodeRef} className={`rounded-lg transition-all ${isOver ? 'bg-amber-100/60' : ''}`}>
+      {React.isValidElement(children)
+        ? React.cloneElement(children as React.ReactElement<{ isOver?: boolean }>, { isOver })
+        : children}
+    </div>
+  );
+}
+
 // ─── Match box ────────────────────────────────────────────────────────────────
 
 interface MatchBoxProps {
@@ -30,13 +65,12 @@ interface MatchBoxProps {
   players: TPlayer[];
   isActive?: boolean;
   onClick?: () => void;
-  // inline edit
   editMode?: boolean;
   selectedSlot?: PlayerSlot | null;
   onSlotClick?: (slot: PlayerSlot) => void;
 }
 
-function MatchBox({ match, players, isActive, onClick, editMode, selectedSlot, onSlotClick }: MatchBoxProps) {
+function MatchBox({ match, players, isActive, onClick, editMode, onSlotClick }: MatchBoxProps) {
   const find = (id: string | null) => players.find(p => p.id === id)?.player_name ?? (id ? '?' : null);
   const isBye     = match.status === 'bye';
   const isDone    = match.status === 'completed';
@@ -47,23 +81,7 @@ function MatchBox({ match, players, isActive, onClick, editMode, selectedSlot, o
   const teamAStr = `${find(match.team_a_p1) ?? '?'} & ${find(match.team_a_p2) ?? '?'}`;
   const teamBStr = `${find(match.team_b_p1) ?? '?'} & ${find(match.team_b_p2) ?? '?'}`;
 
-  const isSelected = (team: 'A' | 'B', pos: 0 | 1) =>
-    selectedSlot?.matchId === match.id && selectedSlot?.team === team && selectedSlot?.pos === pos;
-  const isTarget = (team: 'A' | 'B', pos: 0 | 1) =>
-    canEdit && selectedSlot !== null && selectedSlot !== undefined &&
-    !(selectedSlot.matchId === match.id && selectedSlot.team === team && selectedSlot.pos === pos);
-
-  const slotClick = (team: 'A' | 'B', pos: 0 | 1, playerId: string | null) => {
-    if (!canEdit || !onSlotClick) return;
-    onSlotClick({ matchId: match.id, team, pos, playerId });
-  };
-
-  const slots: { team: 'A'|'B'; pos: 0|1; id: string|null }[] = [
-    { team: 'A', pos: 0, id: match.team_a_p1 },
-    { team: 'A', pos: 1, id: match.team_a_p2 },
-    { team: 'B', pos: 0, id: match.team_b_p1 },
-    { team: 'B', pos: 1, id: match.team_b_p2 },
-  ];
+  const slotId = (team: 'A' | 'B', pos: 0 | 1) => `${match.id}|${team}|${pos}`;
 
   return (
     <div
@@ -84,51 +102,60 @@ function MatchBox({ match, players, isActive, onClick, editMode, selectedSlot, o
         </div>
       )}
       {canEdit && (
-        <div className="bg-amber-400/20 text-amber-700 text-[7px] font-black uppercase tracking-widest text-center shrink-0 py-[2px]">
-          ✎ tap player to move
+        <div className="bg-amber-400 text-amber-900 text-[7px] font-black uppercase tracking-widest text-center shrink-0 py-[2px]">
+          ✦ DRAG TO REARRANGE
         </div>
       )}
 
       {canEdit ? (
-        /* ── Edit mode: show 4 individual clickable player chips ── */
-        <div className="flex flex-col divide-y divide-gray-100">
-          {(['A', 'B'] as const).map((team) => (
-            <div key={team} className={`flex items-center gap-1 px-2 py-1.5 ${match.winner_team && match.winner_team !== team ? 'opacity-40' : ''} ${match.winner_team === team ? 'bg-green-50' : ''}`}>
-              {match.winner_team === team && <Trophy className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
-              <div className="flex flex-wrap gap-1 flex-1 min-w-0">
-                {([0, 1] as const).map(pos => {
-                  const pid = team === 'A' ? (pos === 0 ? match.team_a_p1 : match.team_a_p2) : (pos === 0 ? match.team_b_p1 : match.team_b_p2);
-                  const name = find(pid);
-                  if (!name) return null;
-                  const sel = isSelected(team, pos);
-                  const tgt = isTarget(team, pos);
-                  return (
-                    <button
-                      key={pos}
-                      onClick={() => slotClick(team, pos, pid)}
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-all
-                        ${sel ? 'bg-amber-400 text-amber-900 border-amber-500 shadow-md scale-105' :
-                          tgt ? 'bg-blue-100 text-blue-700 border-blue-400 animate-pulse cursor-pointer' :
-                                'bg-white text-slate-700 border-gray-200 hover:border-amber-400 hover:bg-amber-50 cursor-pointer'}`}
-                    >
-                      {name}
-                    </button>
-                  );
-                })}
-              </div>
-              {(isLive || isDone) && (
-                <span className={`text-sm font-black shrink-0 tabular-nums ml-1
-                  ${match.winner_team === team ? 'text-primary' : isLive ? 'text-red-500' : 'text-gray-400'}`}>
-                  {team === 'A' ? match.score_a : match.score_b}
-                </span>
-              )}
+        /* ── Edit mode: Team A / VS / Team B with drag-and-drop chips ── */
+        <div className="flex flex-col">
+          {/* Team A */}
+          <div className="px-2 pt-2 pb-1.5 bg-green-50/60">
+            <div className="flex items-center gap-1 mb-1">
+              <span className="text-[8px] font-black uppercase tracking-wider text-green-700 bg-green-200/60 px-1.5 py-0.5 rounded">A</span>
             </div>
-          ))}
-          {isBye && (
-            <div className="px-3 py-2 bg-gray-50">
-              <span className="text-[10px] text-gray-400 italic">BYE — auto advance</span>
+            <div className="flex flex-wrap gap-1">
+              {([0, 1] as const).map(pos => {
+                const pid = pos === 0 ? match.team_a_p1 : match.team_a_p2;
+                const name = find(pid);
+                if (!name) return null;
+                const id = slotId('A', pos);
+                return (
+                  <DroppableSlot key={pos} id={id}>
+                    <DraggableChip id={id} name={name} />
+                  </DroppableSlot>
+                );
+              })}
             </div>
-          )}
+          </div>
+
+          {/* VS divider */}
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-50">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-[8px] font-black text-gray-400 tracking-widest">VS</span>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
+
+          {/* Team B */}
+          <div className="px-2 pt-1.5 pb-2 bg-blue-50/40">
+            <div className="flex items-center gap-1 mb-1">
+              <span className="text-[8px] font-black uppercase tracking-wider text-blue-700 bg-blue-200/60 px-1.5 py-0.5 rounded">B</span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {([0, 1] as const).map(pos => {
+                const pid = pos === 0 ? match.team_b_p1 : match.team_b_p2;
+                const name = find(pid);
+                if (!name) return null;
+                const id = slotId('B', pos);
+                return (
+                  <DroppableSlot key={pos} id={id}>
+                    <DraggableChip id={id} name={name} />
+                  </DroppableSlot>
+                );
+              })}
+            </div>
+          </div>
         </div>
       ) : (
         /* ── Normal mode: original team-name rows ── */
@@ -292,13 +319,11 @@ interface SectionProps {
   onMatchClick?: (m: TMatch) => void;
   activeMatchId?: string | null;
   editMode?: boolean;
-  selectedSlot?: PlayerSlot | null;
-  onSlotClick?: (slot: PlayerSlot) => void;
 }
 
 function BracketSection({
   label, labelIcon, accentColor, rounds, roundLabels, players, onMatchClick, activeMatchId,
-  editMode, selectedSlot, onSlotClick,
+  editMode,
 }: SectionProps) {
   const r1Count = rounds[0]?.length ?? 0;
   if (r1Count === 0) return null;
@@ -354,8 +379,6 @@ function BracketSection({
                         players={players}
                         isActive={activeMatchId === match.id}
                         editMode={editMode}
-                        selectedSlot={selectedSlot}
-                        onSlotClick={onSlotClick}
                         onClick={onMatchClick && match.status !== 'bye' ? () => onMatchClick(match) : undefined}
                       />
                     </div>
@@ -378,12 +401,22 @@ export interface BracketViewProps {
   onMatchClick?: (m: TMatch) => void;
   activeMatchId?: string | null;
   editMode?: boolean;
-  selectedSlot?: PlayerSlot | null;
-  onSlotClick?: (slot: PlayerSlot) => void;
+  onSlotSwap?: (a: PlayerSlot, b: PlayerSlot) => void;
 }
 
-export default function BracketView({ matches, players, onMatchClick, activeMatchId, editMode, selectedSlot, onSlotClick }: BracketViewProps) {
-  // Separate brackets
+function parseSlotId(id: string): PlayerSlot | null {
+  const parts = id.split('|');
+  if (parts.length !== 3) return null;
+  const [matchId, team, posStr] = parts;
+  if (team !== 'A' && team !== 'B') return null;
+  const pos = parseInt(posStr) as 0 | 1;
+  if (pos !== 0 && pos !== 1) return null;
+  return { matchId, team, pos, playerId: null };
+}
+
+export default function BracketView({ matches, players, onMatchClick, activeMatchId, editMode, onSlotSwap }: BracketViewProps) {
+  const [dragOverlay, setDragOverlay] = React.useState<string | null>(null);
+
   const wbMatches = matches.filter(m => m.bracket === 'winners');
   const lbMatches = matches.filter(m => m.bracket === 'losers');
   const gf        = matches.find(m => m.bracket === 'grand_final');
@@ -394,7 +427,6 @@ export default function BracketView({ matches, players, onMatchClick, activeMatc
   const wbByRound = wbRounds.map(r => wbMatches.filter(m => m.round === r).sort((a, b) => a.match_number - b.match_number));
   const lbByRound = lbRounds.map(r => lbMatches.filter(m => m.round === r).sort((a, b) => a.match_number - b.match_number));
 
-  // Round labels
   const wbLabels = wbRounds.map((r, i) => {
     if (i === wbRounds.length - 1) return 'UB Final';
     if (i === wbRounds.length - 2 && wbRounds.length > 2) return 'UB Semi';
@@ -406,15 +438,40 @@ export default function BracketView({ matches, players, onMatchClick, activeMatc
     return `LB Round ${r}`;
   });
 
+  const handleDragEnd = (event: DragEndEvent) => {
+    setDragOverlay(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const slotA = parseSlotId(String(active.id));
+    const slotB = parseSlotId(String(over.id));
+    if (!slotA || !slotB || !onSlotSwap) return;
+    // attach playerId from matches
+    const findPlayer = (s: PlayerSlot) => {
+      const m = matches.find(mx => mx.id === s.matchId);
+      if (!m) return null;
+      if (s.team === 'A') return s.pos === 0 ? m.team_a_p1 : m.team_a_p2;
+      return s.pos === 0 ? m.team_b_p1 : m.team_b_p2;
+    };
+    onSlotSwap({ ...slotA, playerId: findPlayer(slotA) }, { ...slotB, playerId: findPlayer(slotB) });
+  };
+
   const clickable = (m: TMatch) =>
-    onMatchClick && m.status !== 'bye'
-      ? () => onMatchClick(m)
-      : undefined;
+    onMatchClick && m.status !== 'bye' ? () => onMatchClick(m) : undefined;
 
-  return (
+  // Find name of dragging chip for overlay
+  const overlayName = dragOverlay
+    ? (() => {
+        const s = parseSlotId(dragOverlay);
+        if (!s) return null;
+        const m = matches.find(mx => mx.id === s.matchId);
+        if (!m) return null;
+        const pid = s.team === 'A' ? (s.pos === 0 ? m.team_a_p1 : m.team_a_p2) : (s.pos === 0 ? m.team_b_p1 : m.team_b_p2);
+        return players.find(p => p.id === pid)?.player_name ?? null;
+      })()
+    : null;
+
+  const inner = (
     <div className="space-y-10">
-
-      {/* ── Upper / Winners Bracket ── */}
       {wbByRound.length > 0 && (
         <BracketSection
           label="Upper Bracket"
@@ -426,18 +483,12 @@ export default function BracketView({ matches, players, onMatchClick, activeMatc
           onMatchClick={onMatchClick}
           activeMatchId={activeMatchId}
           editMode={editMode}
-          selectedSlot={selectedSlot}
-          onSlotClick={onSlotClick}
         />
       )}
-
-      {/* ── Lower / Losers Bracket ── */}
       {lbByRound.length > 0 && (
         <BracketSection
           label="Lower Bracket"
-          labelIcon={
-            <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[9px] flex items-center justify-center font-black shrink-0">L</span>
-          }
+          labelIcon={<span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[9px] flex items-center justify-center font-black shrink-0">L</span>}
           accentColor="#93c5fd"
           rounds={lbByRound}
           roundLabels={lbLabels}
@@ -445,28 +496,17 @@ export default function BracketView({ matches, players, onMatchClick, activeMatc
           onMatchClick={onMatchClick}
           activeMatchId={activeMatchId}
           editMode={editMode}
-          selectedSlot={selectedSlot}
-          onSlotClick={onSlotClick}
         />
       )}
-
-      {/* ── Grand Final ── */}
       {gf && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <span className="text-lg">🎯</span>
             <span className="text-xs font-black uppercase tracking-widest text-on-surface">Grand Final</span>
           </div>
-          <MatchBox
-            match={gf}
-            players={players}
-            isActive={activeMatchId === gf.id}
-            onClick={clickable(gf)}
-          />
+          <MatchBox match={gf} players={players} isActive={activeMatchId === gf.id} onClick={clickable(gf)} />
         </div>
       )}
-
-      {/* Empty state */}
       {wbByRound.length === 0 && lbByRound.length === 0 && !gf && (
         <div className="text-center py-12 text-slate-400">
           <Trophy className="w-10 h-10 mx-auto mb-3 opacity-20" />
@@ -474,5 +514,24 @@ export default function BracketView({ matches, players, onMatchClick, activeMatc
         </div>
       )}
     </div>
+  );
+
+  if (!editMode) return inner;
+
+  return (
+    <DndContext
+      onDragStart={e => setDragOverlay(String(e.active.id))}
+      onDragCancel={() => setDragOverlay(null)}
+      onDragEnd={handleDragEnd}
+    >
+      {inner}
+      <DragOverlay>
+        {overlayName && (
+          <div className="text-[10px] font-bold px-2 py-1 rounded-lg border bg-amber-400 text-amber-900 border-amber-500 shadow-lg cursor-grabbing">
+            {overlayName}
+          </div>
+        )}
+      </DragOverlay>
+    </DndContext>
   );
 }
