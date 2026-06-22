@@ -149,26 +149,61 @@ export function advanceRound(
   const wbLosers  = wbCompleted.filter(m => m.status === 'completed' && m.winner_team !== null).map(losers);
   const lbWinners = lbCompleted.filter(m => m.status === 'completed').map(winners);
 
-  // Grand Final: 1 WB winner vs 1 LB winner
-  if (isWBFinal && wbWinners.length === 1 && lbWinners.length === 1) {
-    return {
-      nextWBMatches: [],
-      nextLBMatches: [],
-      grandFinal: {
-        tournament_id: tournamentId,
-        bracket: 'grand_final',
-        round: nextWBRound,
-        match_number: 1,
-        team_a_p1: wbWinners[0].p1,
-        team_a_p2: wbWinners[0].p2,
-        team_b_p1: lbWinners[0].p1,
-        team_b_p2: lbWinners[0].p2,
-        score_a: 0, score_b: 0,
-        winner_team: null,
-        status: 'pending',
-        game_id: null,
-      },
-    };
+  // WB Final done → UB Final loser MUST drop into LB Final before Grand Final
+  if (isWBFinal && wbWinners.length === 1) {
+    const wbFinalLoser = wbCompleted
+      .filter(m => m.status === 'completed' && m.winner_team !== null)
+      .map(losers)[0];
+
+    if (wbFinalLoser && lbWinners.length === 1) {
+      // Check if the LB Final (with UB Final loser) has already been played
+      const lbAlreadyHasUBLoser = lbCompleted.some(m =>
+        m.team_a_p1 === wbFinalLoser.p1 || m.team_a_p2 === wbFinalLoser.p1 ||
+        m.team_b_p1 === wbFinalLoser.p1 || m.team_b_p2 === wbFinalLoser.p1
+      );
+
+      if (lbAlreadyHasUBLoser) {
+        // LB Final was just played with the UB Final loser → now generate Grand Final
+        return {
+          nextWBMatches: [],
+          nextLBMatches: [],
+          grandFinal: {
+            tournament_id: tournamentId,
+            bracket: 'grand_final',
+            round: nextWBRound,
+            match_number: 1,
+            team_a_p1: wbWinners[0].p1,
+            team_a_p2: wbWinners[0].p2,
+            team_b_p1: lbWinners[0].p1,
+            team_b_p2: lbWinners[0].p2,
+            score_a: 0, score_b: 0,
+            winner_team: null,
+            status: 'pending',
+            game_id: null,
+          },
+        };
+      } else {
+        // LB Final not played yet → make UB Final loser drop to LB Final
+        return {
+          nextWBMatches: [],
+          nextLBMatches: [{
+            tournament_id: tournamentId,
+            bracket: 'losers',
+            round: nextLBRound,
+            match_number: 1,
+            team_a_p1: lbWinners[0].p1,
+            team_a_p2: lbWinners[0].p2,
+            team_b_p1: wbFinalLoser.p1,
+            team_b_p2: wbFinalLoser.p2,
+            score_a: 0, score_b: 0,
+            winner_team: null,
+            status: 'pending',
+            game_id: null,
+          }],
+          grandFinal: null,
+        };
+      }
+    }
   }
 
   // Shuffle WB winners so next-round matchups are random, not positional
