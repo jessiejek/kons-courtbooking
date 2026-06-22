@@ -144,7 +144,8 @@ export function advanceRound(
     ? { p1: m.team_b_p1, p2: m.team_b_p2 }
     : { p1: m.team_a_p1, p2: m.team_a_p2 };
 
-  const wbWinners = wbCompleted.filter(m => m.status === 'completed').map(winners);
+  // Include bye matches — bye winner_team is always 'A'
+  const wbWinners = wbCompleted.filter(m => m.status === 'completed' || m.status === 'bye').map(winners);
   const wbLosers  = wbCompleted.filter(m => m.status === 'completed' && m.winner_team !== null).map(losers);
   const lbWinners = lbCompleted.filter(m => m.status === 'completed').map(winners);
 
@@ -170,13 +171,16 @@ export function advanceRound(
     };
   }
 
-  // Next WB matches: pair up WB winners
+  // Shuffle WB winners so next-round matchups are random, not positional
+  const shuffledWBWinners = [...wbWinners].sort(() => Math.random() - 0.5);
+
+  // Next WB matches: pair up WB winners (randomized)
   const nextWBMatches: Omit<TMatch, 'id'>[] = [];
-  for (let i = 0; i < wbWinners.length; i += 2) {
-    const tA = wbWinners[i];
-    const tB = wbWinners[i + 1];
+  for (let i = 0; i < shuffledWBWinners.length; i += 2) {
+    const tA = shuffledWBWinners[i];
+    const tB = shuffledWBWinners[i + 1];
     if (!tB) {
-      // Bye — tA advances automatically
+      // Odd winner out — bye
       nextWBMatches.push({
         tournament_id: tournamentId, bracket: 'winners',
         round: nextWBRound, match_number: Math.floor(i / 2) + 1,
@@ -197,12 +201,19 @@ export function advanceRound(
     }
   }
 
-  // Next LB matches: WB losers + LB winners mixed
-  const lbPool = [...wbLosers, ...lbWinners];
+  // LB pool: if LB is already running (lbCompleted has matches), WB losers feed into it.
+  // If LB is empty (first time), WB losers ARE the LB R1 entrants.
+  // Either way: lbPool = wbLosers (dropped from this WB round) + lbWinners (advancing in LB).
+  // When LB was empty and wbLosers formed LB R1, those teams are now in lbCompleted,
+  // so lbWinners already has the survivor — don't double-add original wbLosers.
+  const lbPool = lbCompleted.length > 0
+    ? [...lbWinners, ...wbLosers]   // LB already running: LB survivors + fresh WB drops
+    : [...wbLosers];                // First LB round: just WB drops (no prior LB)
+  const shuffledLBPool = [...lbPool].sort(() => Math.random() - 0.5);
   const nextLBMatches: Omit<TMatch, 'id'>[] = [];
-  for (let i = 0; i < lbPool.length; i += 2) {
-    const tA = lbPool[i];
-    const tB = lbPool[i + 1];
+  for (let i = 0; i < shuffledLBPool.length; i += 2) {
+    const tA = shuffledLBPool[i];
+    const tB = shuffledLBPool[i + 1];
     if (!tB) {
       nextLBMatches.push({
         tournament_id: tournamentId, bracket: 'losers',

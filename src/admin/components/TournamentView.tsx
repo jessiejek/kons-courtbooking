@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback, type ReactNode, type FormEvent } from 'react';
 import {
   DndContext, DragEndEvent, DragOverlay, DragStartEvent,
   PointerSensor, useSensor, useSensors, closestCenter,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { Plus, Shuffle, Lock, Trophy, ChevronRight, Share2, RefreshCw, X } from 'lucide-react';
+import { Plus, Shuffle, Lock, Trophy, Share2, RefreshCw, X } from 'lucide-react';
+import BracketView from '../../components/BracketView';
 import { supabase, isSupabaseEnabled } from '../../lib/supabase';
 import { useToast, ToastContainer } from '../../components/Toast';
 import {
@@ -14,7 +15,7 @@ import {
 } from '../../lib/tournamentBracket';
 import type { TPlayer, TMatch, BracketSlot } from '../../lib/tournamentBracket';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface Tournament {
   id: string;
@@ -38,7 +39,7 @@ interface OPGame {
   team_b: string[];
 }
 
-// ─── Draggable Player Chip ─────────────────────────────────────────────────────
+// â”€â”€â”€ Draggable Player Chip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function DraggablePlayer({ slot, isDragging }: { slot: BracketSlot; isDragging: boolean }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `slot-${slot.seed}` });
@@ -62,7 +63,7 @@ function DraggablePlayer({ slot, isDragging }: { slot: BracketSlot; isDragging: 
   );
 }
 
-function DroppableSlot({ slot, children, isOver }: { slot: BracketSlot; children: React.ReactNode; isOver: boolean }) {
+function DroppableSlot({ slot, children, isOver }: { slot: BracketSlot; children: ReactNode; isOver: boolean }) {
   const { setNodeRef } = useDroppable({ id: `slot-${slot.seed}` });
   return (
     <div ref={setNodeRef} className={`rounded-lg transition-all ${isOver ? 'ring-2 ring-primary ring-offset-1' : ''}`}>
@@ -71,104 +72,8 @@ function DroppableSlot({ slot, children, isOver }: { slot: BracketSlot; children
   );
 }
 
-// ─── Bracket Match Box ────────────────────────────────────────────────────────
 
-function MatchBox({
-  match, players, onClick, isActive,
-}: {
-  match: TMatch;
-  players: TPlayer[];
-  onClick?: () => void;
-  isActive: boolean;
-}) {
-  const teamA = getTeamName(match, 'A', players);
-  const teamB = getTeamName(match, 'B', players);
-  const isBye = match.status === 'bye';
-  const isDone = match.status === 'completed';
-  const isLive = match.status === 'active';
-
-  return (
-    <div
-      onClick={onClick}
-      className={`w-52 rounded-xl border-2 overflow-hidden transition-all
-        ${isLive ? 'border-red-400 shadow-lg shadow-red-100 cursor-pointer' : ''}
-        ${isDone ? 'border-gray-200 opacity-80' : ''}
-        ${!isLive && !isDone && !isBye ? 'border-outline-variant/40 hover:border-primary/40 cursor-pointer' : ''}
-        ${isBye ? 'border-dashed border-gray-200' : ''}
-        ${isActive ? 'ring-2 ring-primary' : ''}
-      `}
-    >
-      {/* Team A */}
-      <div className={`px-3 py-2 flex items-center justify-between gap-2
-        ${match.winner_team === 'A' ? 'bg-green-50' : 'bg-white'}
-        ${match.winner_team === 'B' ? 'opacity-50' : ''}
-      `}>
-        <span className={`text-xs font-bold truncate ${match.winner_team === 'A' ? 'text-primary' : 'text-on-surface'}`}>
-          {teamA}
-        </span>
-        {isDone && <span className={`text-sm font-black shrink-0 ${match.winner_team === 'A' ? 'text-primary' : 'text-gray-400'}`}>{match.score_a}</span>}
-        {isLive && <span className="text-sm font-black text-red-500 shrink-0">{match.score_a}</span>}
-      </div>
-      {/* Divider */}
-      <div className="h-px bg-outline-variant/20 mx-2" />
-      {/* Team B */}
-      {isBye ? (
-        <div className="px-3 py-2 bg-gray-50">
-          <span className="text-xs text-gray-400 italic">BYE</span>
-        </div>
-      ) : (
-        <div className={`px-3 py-2 flex items-center justify-between gap-2
-          ${match.winner_team === 'B' ? 'bg-green-50' : 'bg-white'}
-          ${match.winner_team === 'A' ? 'opacity-50' : ''}
-        `}>
-          <span className={`text-xs font-bold truncate ${match.winner_team === 'B' ? 'text-primary' : 'text-on-surface'}`}>
-            {teamB}
-          </span>
-          {isDone && <span className={`text-sm font-black shrink-0 ${match.winner_team === 'B' ? 'text-primary' : 'text-gray-400'}`}>{match.score_b}</span>}
-          {isLive && <span className="text-sm font-black text-red-500 shrink-0">{match.score_b}</span>}
-        </div>
-      )}
-      {/* Status strip */}
-      {isLive && (
-        <div className="bg-red-500 text-white text-[9px] font-black uppercase tracking-widest text-center py-0.5 flex items-center justify-center gap-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse inline-block" />LIVE
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Bracket Column ───────────────────────────────────────────────────────────
-
-function BracketColumn({
-  label, matches, players, activeMatchId, onMatchClick,
-}: {
-  label: string;
-  matches: TMatch[];
-  players: TPlayer[];
-  activeMatchId: string | null;
-  onMatchClick: (m: TMatch) => void;
-}) {
-  if (matches.length === 0) return null;
-  return (
-    <div className="flex flex-col items-center gap-1 min-w-[220px]">
-      <span className="text-[9px] font-black uppercase tracking-widest text-outline mb-2">{label}</span>
-      <div className="flex flex-col gap-6 justify-around h-full">
-        {matches.map(m => (
-          <MatchBox
-            key={m.id}
-            match={m}
-            players={players}
-            isActive={activeMatchId === m.id}
-            onClick={() => m.status !== 'bye' && onMatchClick(m)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Create Tournament Modal ───────────────────────────────────────────────────
+// â”€â”€â”€ Create Tournament Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function CreateTournamentModal({ onClose, onCreate }: { onClose: () => void; onCreate: (t: Tournament) => void }) {
   const [name, setName] = useState('');
@@ -176,7 +81,7 @@ function CreateTournamentModal({ onClose, onCreate }: { onClose: () => void; onC
   const [maxPlayers, setMaxPlayers] = useState(12);
   const [saving, setSaving] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!supabase) return;
     setSaving(true);
@@ -228,7 +133,7 @@ function CreateTournamentModal({ onClose, onCreate }: { onClose: () => void; onC
   );
 }
 
-// ─── Add Player Modal ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Add Player Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function AddPlayerModal({
   tournamentId, onClose, onAdd,
@@ -244,7 +149,7 @@ function AddPlayerModal({
     { value: 'pro', label: 'Pro' },
   ] as const;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!supabase) return;
     setSaving(true);
@@ -294,7 +199,7 @@ function AddPlayerModal({
   );
 }
 
-// ─── Scoring Modal (wraps existing scoring logic inline) ──────────────────────
+// â”€â”€â”€ Scoring Modal (wraps existing scoring logic inline) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ScoringModal({
   match, players, tournament, onClose, onComplete,
@@ -393,7 +298,7 @@ function ScoringModal({
         <div className="flex items-center justify-between px-5 py-4 border-b border-outline-variant/20">
           <div>
             <span className="text-[9px] font-black uppercase tracking-widest text-outline">
-              {match.bracket === 'winners' ? '🏆 Winners' : match.bracket === 'losers' ? '🔵 Losers' : '🎯 Grand Final'} · Round {match.round}
+              {match.bracket === 'winners' ? 'ðŸ† Winners' : match.bracket === 'losers' ? 'ðŸ”µ Losers' : 'ðŸŽ¯ Grand Final'} Â· Round {match.round}
             </span>
             <p className="text-sm font-bold text-on-surface mt-0.5">{teamAName} vs {teamBName}</p>
           </div>
@@ -403,7 +308,7 @@ function ScoringModal({
         <div className="p-5 space-y-4">
           {screen === 'rally' && (
             <div>
-              <p className="text-xs font-black uppercase tracking-widest text-outline mb-3">Rally for Serve — who won?</p>
+              <p className="text-xs font-black uppercase tracking-widest text-outline mb-3">Rally for Serve â€” who won?</p>
               <div className="grid grid-cols-2 gap-3">
                 {(['A', 'B'] as const).map(team => (
                   <button key={team} onClick={() => { setServingTeam(team); setScreen('scoring'); supabase?.from('tournament_matches').update({ status: 'active' }).eq('id', match.id); }}
@@ -429,7 +334,7 @@ function ScoringModal({
                       return (
                         <div key={p.id} className={`flex items-center justify-between rounded-lg px-2 py-1.5 mb-1 ${isServer ? 'bg-primary/10' : ''}`}>
                           <span className={`text-xs font-bold ${isServer ? 'text-primary' : 'text-on-surface'}`}>{p.player_name}</span>
-                          {isServer && <span className="text-[9px] font-black bg-primary text-white px-1.5 py-0.5 rounded-full">SERVING · {getSide('A')}</span>}
+                          {isServer && <span className="text-[9px] font-black bg-primary text-white px-1.5 py-0.5 rounded-full">SERVING Â· {getSide('A')}</span>}
                         </div>
                       );
                     })}
@@ -437,7 +342,7 @@ function ScoringModal({
                   {/* Score */}
                   <div className="flex flex-col items-center justify-center py-4 bg-gray-50">
                     <div className={`text-3xl font-black leading-none ${sA > sB ? 'text-primary' : 'text-on-surface'}`}>{sA}</div>
-                    <div className="text-gray-300 text-lg">–</div>
+                    <div className="text-gray-300 text-lg">â€“</div>
                     <div className={`text-3xl font-black leading-none ${sB > sA ? 'text-primary' : 'text-on-surface'}`}>{sB}</div>
                   </div>
                   {/* Team B */}
@@ -448,7 +353,7 @@ function ScoringModal({
                       return (
                         <div key={p.id} className={`flex items-center justify-between rounded-lg px-2 py-1.5 mb-1 ${isServer ? 'bg-primary/10' : ''}`}>
                           <span className={`text-xs font-bold ${isServer ? 'text-primary' : 'text-on-surface'}`}>{p.player_name}</span>
-                          {isServer && <span className="text-[9px] font-black bg-primary text-white px-1.5 py-0.5 rounded-full">SERVING · {getSide('B')}</span>}
+                          {isServer && <span className="text-[9px] font-black bg-primary text-white px-1.5 py-0.5 rounded-full">SERVING Â· {getSide('B')}</span>}
                         </div>
                       );
                     })}
@@ -457,19 +362,19 @@ function ScoringModal({
               </div>
               {/* Serve indicator */}
               <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs font-semibold text-amber-800 text-center">
-                🏓 {serverName} is serving · {getSide(servingTeam)} side
-                {isDeuce(sA, sB) && <span className="ml-2 font-black text-red-600">· DEUCE</span>}
+                ðŸ“ {serverName} is serving Â· {getSide(servingTeam)} side
+                {isDeuce(sA, sB) && <span className="ml-2 font-black text-red-600">Â· DEUCE</span>}
               </div>
               {/* Buttons */}
               <div className="grid grid-cols-2 gap-3">
                 <button onClick={doPoint}
                   className="py-4 bg-primary text-white font-black text-base rounded-xl hover:bg-primary/90 transition-colors">
-                  ✅ Point
+                  âœ… Point
                   <div className="text-xs font-normal opacity-80">Serving team scores</div>
                 </button>
                 <button onClick={doSideOut}
                   className="py-4 bg-gray-100 text-on-surface font-black text-base rounded-xl hover:bg-gray-200 transition-colors">
-                  🔄 Side Out
+                  ðŸ”„ Side Out
                   <div className="text-xs font-normal text-outline">Serve changes</div>
                 </button>
               </div>
@@ -478,13 +383,13 @@ function ScoringModal({
 
           {screen === 'over' && (
             <div className="text-center space-y-3">
-              <div className="text-3xl">🏅</div>
+              <div className="text-3xl">ðŸ…</div>
               <p className="text-lg font-black text-primary">Game Over!</p>
-              <p className="text-3xl font-black">{sA} – {sB}</p>
+              <p className="text-3xl font-black">{sA} â€“ {sB}</p>
               <p className="text-sm font-bold">{sA > sB ? teamAName : teamBName} win!</p>
               <button onClick={handleConfirmWinner} disabled={saving}
                 className="w-full py-3 bg-primary text-white font-black text-sm rounded-xl disabled:opacity-50">
-                {saving ? 'Saving...' : '✓ Confirm & Advance Bracket'}
+                {saving ? 'Saving...' : 'âœ“ Confirm & Advance Bracket'}
               </button>
             </div>
           )}
@@ -494,7 +399,7 @@ function ScoringModal({
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function TournamentView() {
   const { toasts, toast, removeToast } = useToast();
@@ -514,7 +419,7 @@ export default function TournamentView() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  // ── Load ──────────────────────────────────────────────────────────────────
+  // â”€â”€ Load â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const loadTournaments = useCallback(async () => {
     if (!supabase) return;
@@ -557,7 +462,7 @@ export default function TournamentView() {
     }
   }, [tournament?.status, players, slots.length]);
 
-  // ── Drag & Drop ────────────────────────────────────────────────────────────
+  // â”€â”€ Drag & Drop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleDragStart = (e: DragStartEvent) => setDragActiveId(e.active.id as string);
   const handleDragOver = (e: any) => setOverSlotId(e.over?.id ?? null);
@@ -572,7 +477,7 @@ export default function TournamentView() {
     setSlots(prev => swapSlots(prev, fromSeed, toSeed));
   };
 
-  // ── Actions ────────────────────────────────────────────────────────────────
+  // â”€â”€ Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleStartSeeding = async () => {
     if (!supabase || !selectedId) return;
@@ -603,7 +508,7 @@ export default function TournamentView() {
     setActiveMatchForScoring(null);
     await loadTournamentData(selectedId!);
 
-    // Check if all current round matches are done → generate next round
+    // Check if all current round matches are done â†’ generate next round
     const updated = await supabase?.from('tournament_matches').select('*').eq('tournament_id', selectedId!).order('round').order('match_number');
     if (!updated?.data) return;
     const allMatches = updated.data as TMatch[];
@@ -622,7 +527,7 @@ export default function TournamentView() {
       if (grandFinal.status === 'completed') {
         await supabase?.from('tournaments').update({ status: 'completed' }).eq('id', selectedId!);
         setTournaments(prev => prev.map(t => t.id === selectedId ? { ...t, status: 'completed' } : t));
-        toast('success', '🏆 Tournament Complete!', 'Grand Final finished.');
+        toast('success', 'ðŸ† Tournament Complete!', 'Grand Final finished.');
       }
       return;
     }
@@ -639,11 +544,7 @@ export default function TournamentView() {
     }
   };
 
-  // ── Render helpers ─────────────────────────────────────────────────────────
-
-  const wbRounds = [...new Set(matches.filter(m => m.bracket === 'winners').map(m => m.round))].sort();
-  const lbRounds = [...new Set(matches.filter(m => m.bracket === 'losers').map(m => m.round))].sort();
-  const grandFinal = matches.find(m => m.bracket === 'grand_final');
+  // â”€â”€ Render helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const draggedSlot = dragActiveId ? slots.find(s => `slot-${s.seed}` === dragActiveId) : null;
 
@@ -714,7 +615,7 @@ export default function TournamentView() {
             </button>
           </div>
 
-          {/* ── REGISTRATION ── */}
+          {/* â”€â”€ REGISTRATION â”€â”€ */}
           {tournament.status === 'registration' && (
             <div className="grid lg:grid-cols-[300px_1fr] gap-6">
               <div className="bg-white border border-outline-variant/40 rounded-2xl p-5 space-y-4">
@@ -744,10 +645,10 @@ export default function TournamentView() {
                 )}
               </div>
               <div className="bg-white border border-outline-variant/40 rounded-2xl p-8 flex flex-col items-center justify-center text-center gap-4">
-                <div className="text-4xl">🎯</div>
+                <div className="text-4xl">ðŸŽ¯</div>
                 <div>
                   <p className="font-black text-on-surface text-lg">Ready to seed the bracket?</p>
-                  <p className="text-sm text-on-surface-variant mt-1">{players.length} players registered · need {players.length % 4 === 0 ? 'even' : 'more'} for clean bracket</p>
+                  <p className="text-sm text-on-surface-variant mt-1">{players.length} players registered Â· need {players.length % 4 === 0 ? 'even' : 'more'} for clean bracket</p>
                 </div>
                 <button onClick={handleStartSeeding} disabled={players.length < 4}
                   className="flex items-center gap-2 px-6 py-3 bg-primary text-white font-black rounded-xl disabled:opacity-50 hover:bg-primary/90 transition-colors">
@@ -757,7 +658,7 @@ export default function TournamentView() {
             </div>
           )}
 
-          {/* ── SEEDING ── */}
+          {/* â”€â”€ SEEDING â”€â”€ */}
           {tournament.status === 'seeding' && (
             <div className="space-y-4">
               <div className="flex items-center gap-3 flex-wrap">
@@ -775,7 +676,7 @@ export default function TournamentView() {
               <DndContext sensors={sensors} collisionDetection={closestCenter}
                 onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
 
-                {/* Slot grid — groups of 4 = 1 match */}
+                {/* Slot grid â€” groups of 4 = 1 match */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {Array.from({ length: Math.ceil(slots.length / 4) }, (_, matchIdx) => {
                     const matchSlots = slots.slice(matchIdx * 4, matchIdx * 4 + 4);
@@ -821,7 +722,7 @@ export default function TournamentView() {
             </div>
           )}
 
-          {/* ── ACTIVE / BRACKET VIEW ── */}
+          {/* â”€â”€ ACTIVE / BRACKET VIEW â”€â”€ */}
           {(tournament.status === 'active' || tournament.status === 'completed') && (
             <div className="space-y-6">
               {/* Players standings */}
@@ -833,85 +734,34 @@ export default function TournamentView() {
                         p.losses === 1 ? 'bg-amber-50 text-amber-700 border-amber-200' :
                         'bg-green-50 text-primary border-primary/20'}`}>
                       {p.player_name}
-                      <span className="text-[9px]">{p.losses === 0 ? '0L' : p.losses === 1 ? '1L ⚠️' : '❌'}</span>
+                      <span className="text-[9px]">{p.losses === 0 ? '0L' : p.losses === 1 ? '1L âš ï¸' : 'âŒ'}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Winners Bracket */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Trophy className="w-4 h-4 text-amber-500" />
-                  <span className="text-xs font-black uppercase tracking-widest text-on-surface">Winners Bracket</span>
-                </div>
-                <div className="overflow-x-auto">
-                  <div className="flex gap-8 pb-4 min-w-max">
-                    {wbRounds.map(round => (
-                      <BracketColumn
-                        key={round}
-                        label={`Round ${round}`}
-                        matches={matches.filter(m => m.bracket === 'winners' && m.round === round)}
-                        players={players}
-                        activeMatchId={activeMatchForScoring?.id ?? null}
-                        onMatchClick={setActiveMatchForScoring}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
+              {/* Bracket â€” MSC / TI style */}
+              <BracketView
+                matches={matches}
+                players={players}
+                activeMatchId={activeMatchForScoring?.id ?? null}
+                onMatchClick={m => {
+                  if (m.status !== 'bye') setActiveMatchForScoring(m);
+                }}
+              />
 
-              {/* Losers Bracket */}
-              {lbRounds.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[9px] flex items-center justify-center font-black">L</span>
-                    <span className="text-xs font-black uppercase tracking-widest text-on-surface">Losers Bracket</span>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <div className="flex gap-8 pb-4 min-w-max">
-                      {lbRounds.map(round => (
-                        <BracketColumn
-                          key={round}
-                          label={`Round ${round}`}
-                          matches={matches.filter(m => m.bracket === 'losers' && m.round === round)}
-                          players={players}
-                          activeMatchId={activeMatchForScoring?.id ?? null}
-                          onMatchClick={setActiveMatchForScoring}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Grand Final */}
-              {grandFinal && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-lg">🎯</span>
-                    <span className="text-xs font-black uppercase tracking-widest text-on-surface">Grand Final</span>
-                  </div>
-                  <MatchBox
-                    match={grandFinal}
-                    players={players}
-                    isActive={activeMatchForScoring?.id === grandFinal.id}
-                    onClick={() => grandFinal.status !== 'completed' && setActiveMatchForScoring(grandFinal)}
-                  />
-                </div>
-              )}
-
-              {tournament.status === 'completed' && (
-                <div className="bg-gradient-to-b from-amber-50 to-white border-2 border-amber-400 rounded-2xl p-8 text-center">
-                  <div className="text-4xl mb-2">🏆</div>
-                  <p className="text-2xl font-black text-amber-600">Tournament Champion!</p>
-                  {grandFinal?.winner_team && (
+              {tournament.status === 'completed' && (() => {
+                const gf = matches.find(m => m.bracket === 'grand_final');
+                return gf?.winner_team ? (
+                  <div className="bg-gradient-to-b from-amber-50 to-white border-2 border-amber-400 rounded-2xl p-8 text-center">
+                    <div className="text-4xl mb-2">ðŸ†</div>
+                    <p className="text-2xl font-black text-amber-600">Tournament Champion!</p>
                     <p className="text-lg font-bold text-on-surface mt-2">
-                      {getTeamName(grandFinal, grandFinal.winner_team, players)}
+                      {getTeamName(gf, gf.winner_team, players)}
                     </p>
-                  )}
-                </div>
-              )}
+                  </div>
+                ) : null;
+              })()}
             </div>
           )}
         </div>
