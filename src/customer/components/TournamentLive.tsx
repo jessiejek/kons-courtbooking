@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Trophy, Zap, Shield, Skull, RefreshCw, Star } from 'lucide-react';
+import { Trophy, Zap, Shield, Skull, RefreshCw, Star, UserPlus, CheckCircle, Users, Lock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { getTeamName } from '../../lib/tournamentBracket';
 import type { TPlayer, TMatch } from '../../lib/tournamentBracket';
 import BracketView from '../../components/BracketView';
+import type { CurrentUser } from '../../App';
 
 interface Tournament {
   id: string;
   name: string;
   date: string;
   status: 'registration' | 'seeding' | 'active' | 'completed';
+  max_players: number;
 }
 
 function PlayerCard({ player, rank }: { player: TPlayer; rank: number }) {
@@ -126,24 +128,48 @@ function ChampionBanner({ match, players }: { match: TMatch; players: TPlayer[] 
   );
 }
 
-export default function TournamentLive() {
+export default function TournamentLive({ currentUser, onOpenLogin }: { currentUser: CurrentUser | null; onOpenLogin?: () => void }) {
   const { id } = useParams<{ id: string }>();
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [players, setPlayers]       = useState<TPlayer[]>([]);
   const [matches, setMatches]       = useState<TMatch[]>([]);
   const [loading, setLoading]       = useState(true);
+  const [registering, setRegistering] = useState(false);
+  const [regSuccess, setRegSuccess]   = useState(false);
+
+  const isRegistered = currentUser
+    ? players.some(p => (p as TPlayer & { registered_email?: string }).registered_email === currentUser.email)
+    : false;
+  const spotsLeft = tournament ? tournament.max_players - players.length : 0;
+  const isFull    = spotsLeft <= 0;
 
   const load = async () => {
     if (!supabase || !id) return;
     const [{ data: t }, { data: p }, { data: m }] = await Promise.all([
       supabase.from('tournaments').select('*').eq('id', id).single(),
-      supabase.from('tournament_players').select('*').eq('tournament_id', id).order('seed'),
+      supabase.from('tournament_players').select('*').eq('tournament_id', id).order('created_at', { ascending: true }),
       supabase.from('tournament_matches').select('*').eq('tournament_id', id).order('round').order('match_number'),
     ]);
     if (t) setTournament(t as Tournament);
     if (p) setPlayers(p as TPlayer[]);
     if (m) setMatches(m as TMatch[]);
     setLoading(false);
+  };
+
+  const handleRegister = async () => {
+    if (!supabase || !id || !currentUser) return;
+    setRegistering(true);
+    await supabase.from('tournament_players').insert({
+      tournament_id: id,
+      player_name: currentUser.name,
+      registered_email: currentUser.email,
+      seed: 0,
+      status: 'active',
+      losses: 0,
+    });
+    await load();
+    setRegSuccess(true);
+    setRegistering(false);
   };
 
   useEffect(() => { load(); }, [id]);
@@ -225,6 +251,86 @@ export default function TournamentLive() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+
+        {/* ── Registration panel (only while open) ── */}
+        {tournament && (tournament.status === 'registration' || tournament.status === 'seeding') && (
+          <div className="bg-gray-900/80 border border-gray-700 rounded-3xl overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+              <div className="flex items-center gap-3">
+                <Users className="w-4 h-4 text-green-400" />
+                <span className="text-sm font-black text-white uppercase tracking-widest">
+                  Registered Players
+                </span>
+              </div>
+              <div className={`text-xs font-black px-3 py-1 rounded-full border
+                ${isFull
+                  ? 'bg-red-900/40 border-red-500/50 text-red-400'
+                  : 'bg-green-900/40 border-green-500/50 text-green-400'}`}>
+                {players.length} / {tournament.max_players} spots
+              </div>
+            </div>
+
+            {/* Player slots grid */}
+            <div className="px-6 py-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {Array.from({ length: tournament.max_players }).map((_, i) => {
+                  const player = players[i];
+                  return (
+                    <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold
+                      ${player
+                        ? 'bg-gray-800 border-green-700/50 text-white'
+                        : 'bg-gray-900/40 border-gray-700/40 text-gray-600 border-dashed'}`}>
+                      {player ? (
+                        <>
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
+                          <span className="truncate text-[11px]">{player.player_name}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="w-1.5 h-1.5 rounded-full bg-gray-700 shrink-0" />
+                          <span className="text-[11px] italic">Open slot</span>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* CTA */}
+            {tournament.status === 'registration' && (
+              <div className="px-6 pb-5">
+                {regSuccess || isRegistered ? (
+                  <div className="flex items-center gap-2 px-4 py-3 bg-green-900/40 border border-green-600/40 rounded-2xl">
+                    <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
+                    <p className="text-sm font-bold text-green-300">You're registered! See you on the court.</p>
+                  </div>
+                ) : isFull ? (
+                  <div className="flex items-center gap-2 px-4 py-3 bg-gray-800/60 border border-gray-700 rounded-2xl">
+                    <Lock className="w-4 h-4 text-gray-500 shrink-0" />
+                    <p className="text-sm font-bold text-gray-400">Tournament is full.</p>
+                  </div>
+                ) : currentUser ? (
+                  <button
+                    onClick={handleRegister}
+                    disabled={registering}
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-[#00694c] hover:bg-[#005a40] text-white font-black rounded-2xl transition-colors disabled:opacity-60">
+                    <UserPlus className="w-4 h-4" />
+                    {registering ? 'Registering…' : 'Register Now'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={onOpenLogin}
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-2xl border border-gray-600 transition-colors">
+                    <UserPlus className="w-4 h-4" />
+                    Log in to register
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Champion banner ── */}
         {isCompleted && grandFinal && (

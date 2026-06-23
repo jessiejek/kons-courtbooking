@@ -90,7 +90,7 @@ function DroppableSlot({ slot, children, isOver }: { slot: BracketSlot; children
 function CreateTournamentModal({ onClose, onCreate }: { onClose: () => void; onCreate: (t: Tournament) => void }) {
   const [name, setName] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [maxPlayers, setMaxPlayers] = useState(12);
+  const [maxPlayers, setMaxPlayers] = useState(8);
   const [shuffleEveryRound, setShuffleEveryRound] = useState(false);
   const [courts, setCourts] = useState<Court[]>([]);
   const [courtId, setCourtId] = useState<number | null>(null);
@@ -178,7 +178,7 @@ function CreateTournamentModal({ onClose, onCreate }: { onClose: () => void; onC
           <div>
             <label className="text-xs font-bold text-outline uppercase tracking-wide block mb-1">Max Players</label>
             <div className="flex gap-3">
-              {[10, 12].map(n => (
+              {[8, 16].map(n => (
                 <button key={n} type="button" onClick={() => setMaxPlayers(n)}
                   className={`flex-1 py-2 rounded-xl border-2 text-sm font-bold transition-all
                     ${maxPlayers === n ? 'border-primary bg-primary/5 text-primary' : 'border-outline-variant text-outline'}`}>

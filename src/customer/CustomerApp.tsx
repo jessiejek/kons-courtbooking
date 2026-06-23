@@ -149,7 +149,7 @@ export default function CustomerApp({ role, onLogin, onLogout, currentUser }: Pr
         } />
 
         <Route path="/open-play/live" element={<OpenPlayLive />} />
-        <Route path="/tournament/:id" element={<TournamentLive />} />
+        <Route path="/tournament/:id" element={<TournamentLive currentUser={currentUser} onOpenLogin={() => setLoginModalOpen(true)} />} />
         <Route path="/open-play/register" element={
           <OpenPlayRegister
             currentUser={currentUser}
